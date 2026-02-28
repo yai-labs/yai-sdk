@@ -65,7 +65,10 @@ static int rpc_ping(const char *ws_id)
   char payload[256];
   memset(payload, 0, sizeof(payload));
 
-  int rc = yai_rpc_call_raw(&c, YAI_CMD_PING, NULL, 0, payload, sizeof(payload));
+  uint32_t out_len = 0;
+  int rc = yai_rpc_call_raw(&c, YAI_CMD_PING, NULL, 0, payload, sizeof(payload), &out_len);
+  if (out_len >= sizeof(payload)) out_len = (uint32_t)sizeof(payload) - 1;
+  payload[out_len] = 0;
   if (rc != 0)
   {
     fprintf(stderr, "yai-sdk: ping call failed (rc=%d)\n", rc);
@@ -99,6 +102,7 @@ static int ops_kernel_ping(int argc, char **argv)
 // Kernel ws: runtime doesn’t implement workspace mgmt yet (kernel only handles PING).
 static int ops_kernel_ws(int argc, char **argv)
 {
+  (void)argv;
   if (argc < 1)
   {
     fprintf(stderr, "yai-sdk: missing required arg 'action' (kernel ws)\n");
