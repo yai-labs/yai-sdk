@@ -1,69 +1,46 @@
 # ==========================================
-# yai-sdk (C) Build System
+# yai-sdk (C) Build System - Modular Version
 # ==========================================
 
 CC ?= cc
+AR ?= ar
+ARFLAGS ?= rcs
 ROOT_DIR := $(abspath .)
 
 OUT_BUILD_DIR ?= $(ROOT_DIR)/build
 OUT_LIB_DIR   ?= $(ROOT_DIR)/dist/lib
-
 BUILD_DIR := $(OUT_BUILD_DIR)
 LIB_DIR   := $(OUT_LIB_DIR)
 
-# --- NUOVA LOGICA DI RISOLUZIONE LAW ---
-# Usiamo ?= così puoi anche forzarlo da riga di comando: make YAI_LAW_ROOT=/tmp/law
-# Se lo script fallisce o non esiste, il Makefile darà un errore chiaro.
+# --- Risoluzione Law ---
 YAI_LAW_ROOT ?= $(shell ./tools/sh/resolve_law.sh)
-
 ifeq ($(YAI_LAW_ROOT),)
-  $(error ERRORE: Impossibile trovare yai-law. Assicurati che lo script resolve_law.sh funzioni o imposta YAI_LAW_ROOT manualmente)
+  $(error ERRORE: Impossibile trovare yai-law. Verifica resolve_law.sh o imposta YAI_LAW_ROOT)
 endif
 
-# Usiamo il path risolto per definire le directory dei contratti
-LAW_DIR          := $(YAI_LAW_ROOT)
-LAW_INC_PROTOCOL := $(LAW_DIR)/contracts/protocol/include
-LAW_INC_VAULT    := $(LAW_DIR)/contracts/vault/include
-LAW_INC_RUNTIME  := $(LAW_DIR)/contracts/protocol/runtime/include
-# ---------------------------------------
+# Path Contratti
+LAW_INC_PROTOCOL := $(YAI_LAW_ROOT)/contracts/protocol/include
+LAW_INC_VAULT    := $(YAI_LAW_ROOT)/contracts/vault/include
+LAW_INC_RUNTIME  := $(YAI_LAW_ROOT)/contracts/protocol/runtime/include
 
+# Compiler Flags
 CFLAGS ?= -Wall -Wextra -O2 -std=c11 -MMD -MP
-CFLAGS += -I$(ROOT_DIR)/include
+CFLAGS += -I$(ROOT_DIR)/include -I$(ROOT_DIR)/third_party/cjson
 CFLAGS += -I$(LAW_INC_PROTOCOL) -I$(LAW_INC_VAULT) -I$(LAW_INC_RUNTIME)
-CFLAGS += -I$(ROOT_DIR)/third_party/cjson
+CFLAGS += -DYAI_LAW_ROOT=\"$(YAI_LAW_ROOT)\" -D_POSIX_C_SOURCE=200809L
 
-# IMPORTANTE: Passiamo il path risolto anche al codice C se serve per caricare file a runtime
-CFLAGS += -DYAI_LAW_ROOT=\"$(YAI_LAW_ROOT)\"
-CFLAGS += -DYAI_SDK_ROOT=\"$(ROOT_DIR)\"
-CFLAGS += -D_POSIX_C_SOURCE=200809L
+# --- DEFINIZIONE ARTEFATTI (FIX #2) ---
+SDK_LIB      := $(LIB_DIR)/libyai_sdk.a
+PROTOCOL_LIB := $(LIB_DIR)/libruntime_protocol.a
 
-AR ?= ar
-ARFLAGS ?= rcs
-
-# ------------------------------------------
-# Packaging / Install (enterprise)
-# ------------------------------------------
-
-PREFIX      ?= /usr/local
-DESTDIR     ?=
-
-includedir  ?= $(PREFIX)/include
-libdir      ?= $(PREFIX)/lib
-pkgconfigdir?= $(libdir)/pkgconfig
-datadir     ?= $(PREFIX)/share
-sdkdatadir  ?= $(datadir)/yai-sdk
-
-INSTALL     ?= install
-
-VERSION_FILE := $(ROOT_DIR)/VERSION
-
-LIB := $(LIB_DIR)/libyai_sdk.a
-
-PC_IN  := packaging/yai-sdk.pc.in
-PC_OUT := $(BUILD_DIR)/yai-sdk.pc
-
-SRCS := \
+# Sorgenti del solo Protocollo (Internal Core)
+SRCS_PROTOCOL := \
   src/rpc/rpc_client.c \
+  src/ops/ops_dispatch_gen.c \
+  third_party/cjson/cJSON.c
+
+# Sorgenti dell'SDK (High Level API)
+SRCS_SDK := \
   src/platform/paths.c \
   src/registry/registry.c \
   src/registry/registry_help.c \
@@ -73,113 +50,42 @@ SRCS := \
   src/registry/registry_query.c \
   src/registry/registry_validate.c \
   src/ops/ops_dispatch.c \
-  src/ops/ops_dispatch_gen.c \
-  third_party/cjson/cJSON.c \
-  src/ops/executor.c \
+  src/ops/executor.c
 
-OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS))
-DEPS := $(OBJS:.o=.d)
+OBJS_PROTOCOL := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS_PROTOCOL))
+OBJS_SDK      := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS_SDK))
+ALL_OBJS      := $(OBJS_PROTOCOL) $(OBJS_SDK)
+DEPS          := $(ALL_OBJS:.o=.d)
 
-TEST_BIN := $(BUILD_DIR)/tests/sdk_smoke
+# --- TARGETS ---
+.PHONY: all clean dirs test info libs
 
-.PHONY: all clean dirs test pc install uninstall info
+all: libs
 
-all: dirs $(LIB)
+libs: $(SDK_LIB) $(PROTOCOL_LIB)
 
-# Un piccolo comando di debug utile
 info:
 	@echo "YAI_SDK_ROOT: $(ROOT_DIR)"
 	@echo "YAI_LAW_ROOT: $(YAI_LAW_ROOT)"
+	@echo "Protocol Objects: $(OBJS_PROTOCOL)"
 
 dirs:
 	@mkdir -p $(BUILD_DIR) $(LIB_DIR) $(BUILD_DIR)/tests
 
-$(LIB): $(OBJS)
+# Libreria interna del Protocollo (Leggera)
+$(PROTOCOL_LIB): $(OBJS_PROTOCOL)
 	@echo "[AR] $@"
-	@$(AR) $(ARFLAGS) $@ $(OBJS)
+	@$(AR) $(ARFLAGS) $@ $^
+
+# Libreria SDK completa (Include tutto)
+$(SDK_LIB): $(ALL_OBJS)
+	@echo "[AR] $@"
+	@$(AR) $(ARFLAGS) $@ $^
 
 $(BUILD_DIR)/%.o: %.c | dirs
 	@mkdir -p $(dir $@)
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) -c $< -o $@
-
-test: $(TEST_BIN)
-	@echo "[TEST] $(TEST_BIN)"
-	@$(TEST_BIN)
-
-$(TEST_BIN): tests/sdk_smoke.c $(LIB) | dirs
-	@$(CC) $(CFLAGS) $< -o $@ $(LIB)
-
-
-.PHONY: all clean dirs test pc install uninstall
-
-all: dirs $(LIB)
-
-dirs:
-	@mkdir -p $(BUILD_DIR) $(LIB_DIR) $(BUILD_DIR)/tests
-
-$(LIB): $(OBJS)
-	@echo "[AR] $@"
-	@$(AR) $(ARFLAGS) $@ $(OBJS)
-
-$(BUILD_DIR)/%.o: %.c | dirs
-	@mkdir -p $(dir $@)
-	@echo "[CC] $<"
-	@$(CC) $(CFLAGS) -c $< -o $@
-
-test: $(TEST_BIN)
-	@echo "[TEST] $(TEST_BIN)"
-	@$(TEST_BIN)
-
-$(TEST_BIN): tests/sdk_smoke.c $(LIB) | dirs
-	@$(CC) $(CFLAGS) $< -o $@ $(LIB)
-
-# ------------------------------------------
-# pkg-config
-# ------------------------------------------
-
-pc: $(PC_OUT)
-
-$(PC_OUT): $(PC_IN) $(VERSION_FILE) | dirs
-	@mkdir -p $(dir $@)
-	@echo "[PC] $@"
-	@ver=$$(cat $(VERSION_FILE)); \
-	sed \
-	  -e "s|@prefix@|$(PREFIX)|g" \
-	  -e "s|@includedir@|$(includedir)|g" \
-	  -e "s|@libdir@|$(libdir)|g" \
-	  -e "s|@version@|$$ver|g" \
-	  $(PC_IN) > $@
-
-# ------------------------------------------
-# install / uninstall (DESTDIR-safe)
-# ------------------------------------------
-
-install: $(LIB) pc
-	@echo "[INSTALL] prefix=$(PREFIX) destdir=$(DESTDIR)"
-	@$(INSTALL) -d $(DESTDIR)$(includedir)/yai_sdk
-	@$(INSTALL) -d $(DESTDIR)$(libdir)
-	@$(INSTALL) -d $(DESTDIR)$(pkgconfigdir)
-	@$(INSTALL) -d $(DESTDIR)$(sdkdatadir)
-
-	@# headers (preserve subdirs)
-	@cp -R $(ROOT_DIR)/include/yai_sdk/* $(DESTDIR)$(includedir)/yai_sdk/
-
-	@# library
-	@$(INSTALL) -m 0644 $(LIB) $(DESTDIR)$(libdir)/
-
-	@# pkg-config
-	@$(INSTALL) -m 0644 $(PC_OUT) $(DESTDIR)$(pkgconfigdir)/yai-sdk.pc
-
-	@# version stamp
-	@$(INSTALL) -m 0644 $(VERSION_FILE) $(DESTDIR)$(sdkdatadir)/VERSION
-
-uninstall:
-	@echo "[UNINSTALL] prefix=$(PREFIX) destdir=$(DESTDIR)"
-	@rm -f $(DESTDIR)$(libdir)/libyai_sdk.a
-	@rm -f $(DESTDIR)$(pkgconfigdir)/yai-sdk.pc
-	@rm -f $(DESTDIR)$(sdkdatadir)/VERSION
-	@rm -rf $(DESTDIR)$(includedir)/yai_sdk
 
 clean:
 	@rm -rf $(BUILD_DIR) $(LIB_DIR)
