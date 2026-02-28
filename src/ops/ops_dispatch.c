@@ -59,7 +59,7 @@ static int rpc_connect_and_handshake(
     if (yai_rpc_handshake(c) != 0)
     {
         yai_rpc_close(c);
-        return 4; /* 4-class */
+        return YAI_SDK_RUNTIME_NOT_READY;
     }
 
     return 0;
