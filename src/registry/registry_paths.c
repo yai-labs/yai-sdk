@@ -181,17 +181,16 @@ int yai_law_paths_init(yai_law_paths_t* out, const char* repo_root_hint) {
   }
 
   // 2) SDK-root override (preferred in "CLI pins SDK, SDK pins law")
-  // DYAI_SDK_ROOT is injected by the SDK Makefile (compile-time).
-#ifdef DYAI_SDK_ROOT
-  if (!out->law_dir) {
-    // DYAI_SDK_ROOT includes quotes via -D...=\"...\" so this becomes a C string.
-    const char* sdk_root = DYAI_SDK_ROOT;
-    if (sdk_root && sdk_root[0]) {
-      // <sdk_root>/deps/yai-law
-      (void)yai_try_set_law_dir_join(out, sdk_root, "deps/yai-law");
+  // YAI_SDK_ROOT is injected by the SDK Makefile (compile-time).
+  #ifdef YAI_SDK_ROOT
+    if (!out->law_dir) {
+      const char* sdk_root = YAI_SDK_ROOT; // compile-time string
+      if (sdk_root && sdk_root[0]) {
+        // <sdk_root>/deps/yai-law
+        (void)yai_try_set_law_dir_join(out, sdk_root, "deps/yai-law");
+      }
     }
-  }
-#endif
+  #endif
 
   // 3) repo_root_hint/deps/yai-law (legacy convenience)
   if (!out->law_dir && repo_root_hint && repo_root_hint[0]) {
