@@ -21,6 +21,9 @@ CFLAGS += -I$(ROOT_DIR)/include
 CFLAGS += -I$(LAW_INC_PROTOCOL) -I$(LAW_INC_VAULT) -I$(LAW_INC_RUNTIME)
 CFLAGS += -I$(ROOT_DIR)/third_party/cjson
 
+# Expose the SDK repo root to C code (used to resolve deps/yai-law reliably)
+CFLAGS += -DYAI_SDK_ROOT=\"$(ROOT_DIR)\"
+
 AR ?= ar
 ARFLAGS ?= rcs
 
