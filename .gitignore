@@ -4,3 +4,8 @@ dist/
 *.o
 *.a
 *.d
+
+# build artifacts
+build.log
+build/
+dist/
