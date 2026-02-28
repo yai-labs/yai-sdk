@@ -40,7 +40,8 @@ SRCS := \
   src/registry/registry_validate.c \
   src/ops/ops_dispatch.c \
   src/ops/ops_dispatch_gen.c \
-  third_party/cjson/cJSON.c
+  third_party/cjson/cJSON.c \
+  src/ops/executor.c \
 
 OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS))
 DEPS := $(OBJS:.o=.d)
