@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=${prefix}
+libdir=@libdir@
+includedir=@includedir@
+
+Name: yai-sdk
+Description: YAI SDK (C) — registry + rpc + executor
+Version: @version@
+Cflags: -I${includedir}
+Libs: -L${libdir} -lyai_sdk

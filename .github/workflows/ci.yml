@@ -1,0 +1,19 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  # 1. Il poliziotto controlla i documenti
+  integrity-check:
+    uses: yai-labs/yai-infra/.github/workflows/reusable-audit.yml@main
+
+  # 2. La build parte solo se i documenti sono in regola
+  build:
+    needs: integrity-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Build
+        run: make

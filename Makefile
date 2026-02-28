@@ -11,17 +11,29 @@ OUT_LIB_DIR   ?= $(ROOT_DIR)/dist/lib
 BUILD_DIR := $(OUT_BUILD_DIR)
 LIB_DIR   := $(OUT_LIB_DIR)
 
-LAW_DIR := $(ROOT_DIR)/deps/yai-law
+# --- NUOVA LOGICA DI RISOLUZIONE LAW ---
+# Usiamo ?= così puoi anche forzarlo da riga di comando: make YAI_LAW_ROOT=/tmp/law
+# Se lo script fallisce o non esiste, il Makefile darà un errore chiaro.
+YAI_LAW_ROOT ?= $(shell ./tools/sh/resolve_law.sh)
+
+ifeq ($(YAI_LAW_ROOT),)
+  $(error ERRORE: Impossibile trovare yai-law. Assicurati che lo script resolve_law.sh funzioni o imposta YAI_LAW_ROOT manualmente)
+endif
+
+# Usiamo il path risolto per definire le directory dei contratti
+LAW_DIR          := $(YAI_LAW_ROOT)
 LAW_INC_PROTOCOL := $(LAW_DIR)/contracts/protocol/include
 LAW_INC_VAULT    := $(LAW_DIR)/contracts/vault/include
 LAW_INC_RUNTIME  := $(LAW_DIR)/contracts/protocol/runtime/include
+# ---------------------------------------
 
 CFLAGS ?= -Wall -Wextra -O2 -std=c11 -MMD -MP
 CFLAGS += -I$(ROOT_DIR)/include
 CFLAGS += -I$(LAW_INC_PROTOCOL) -I$(LAW_INC_VAULT) -I$(LAW_INC_RUNTIME)
 CFLAGS += -I$(ROOT_DIR)/third_party/cjson
 
-# Expose the SDK repo root to C code (used to resolve deps/yai-law reliably)
+# IMPORTANTE: Passiamo il path risolto anche al codice C se serve per caricare file a runtime
+CFLAGS += -DYAI_LAW_ROOT=\"$(YAI_LAW_ROOT)\"
 CFLAGS += -DYAI_SDK_ROOT=\"$(ROOT_DIR)\"
 CFLAGS += -D_POSIX_C_SOURCE=200809L
 
@@ -69,6 +81,35 @@ OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS))
 DEPS := $(OBJS:.o=.d)
 
 TEST_BIN := $(BUILD_DIR)/tests/sdk_smoke
+
+.PHONY: all clean dirs test pc install uninstall info
+
+all: dirs $(LIB)
+
+# Un piccolo comando di debug utile
+info:
+	@echo "YAI_SDK_ROOT: $(ROOT_DIR)"
+	@echo "YAI_LAW_ROOT: $(YAI_LAW_ROOT)"
+
+dirs:
+	@mkdir -p $(BUILD_DIR) $(LIB_DIR) $(BUILD_DIR)/tests
+
+$(LIB): $(OBJS)
+	@echo "[AR] $@"
+	@$(AR) $(ARFLAGS) $@ $(OBJS)
+
+$(BUILD_DIR)/%.o: %.c | dirs
+	@mkdir -p $(dir $@)
+	@echo "[CC] $<"
+	@$(CC) $(CFLAGS) -c $< -o $@
+
+test: $(TEST_BIN)
+	@echo "[TEST] $(TEST_BIN)"
+	@$(TEST_BIN)
+
+$(TEST_BIN): tests/sdk_smoke.c $(LIB) | dirs
+	@$(CC) $(CFLAGS) $< -o $@ $(LIB)
+
 
 .PHONY: all clean dirs test pc install uninstall
 
