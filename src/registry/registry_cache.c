@@ -2,8 +2,10 @@
 // src/registry/registry_cache.c
 //
 // File-backed registry cache (block-zero mode).
-// Reads deps/yai-law/registry/{commands,artifacts}.v1.json via law_paths.
-// Later, when you have a real generator, you can swap this to embedded tables.
+// Loads registry JSON from the pinned yai-law reachable via yai_law_paths.
+// In SDK-backed setups, yai_law_paths resolves yai-law via YAI_SDK_ROOT.
+//
+// Later, when a generator exists, this can be swapped to embedded tables.
 
 #include "yai_sdk/registry/registry_cache.h"
 #include "yai_sdk/registry/registry_paths.h"
@@ -16,6 +18,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+// ---------------------------- helpers ----------------------------
+
+static char* yai_strdup0(const char* s) {
+  if (!s) return NULL;
+  size_t n = strlen(s);
+  char* out = (char*)malloc(n + 1);
+  if (!out) return NULL;
+  memcpy(out, s, n + 1);
+  return out;
+}
 
 static char* read_file_all(const char* path) {
   FILE* f = fopen(path, "rb");
@@ -39,7 +52,7 @@ static char* read_file_all(const char* path) {
 static char* dup_json_str(cJSON* obj, const char* key) {
   cJSON* v = cJSON_GetObjectItemCaseSensitive(obj, key);
   if (!cJSON_IsString(v) || !v->valuestring) return NULL;
-  return strdup(v->valuestring);
+  return yai_strdup0(v->valuestring);
 }
 
 static int load_string_array(cJSON* arr, const char*** out_items, size_t* out_len) {
@@ -55,8 +68,17 @@ static int load_string_array(cJSON* arr, const char*** out_items, size_t* out_le
 
   for (int i = 0; i < n; i++) {
     cJSON* it = cJSON_GetArrayItem(arr, i);
-    if (!cJSON_IsString(it) || !it->valuestring) { free(items); return 2; }
-    items[i] = strdup(it->valuestring);
+    if (!cJSON_IsString(it) || !it->valuestring) {
+      for (int j = 0; j < i; j++) free((void*)items[j]);
+      free(items);
+      return 2;
+    }
+    items[i] = yai_strdup0(it->valuestring);
+    if (!items[i]) {
+      for (int j = 0; j < i; j++) free((void*)items[j]);
+      free(items);
+      return ENOMEM;
+    }
   }
 
   *out_items = items;
@@ -106,7 +128,7 @@ static int load_args_array(cJSON* arr, yai_law_arg_t** out_args, size_t* out_len
       args[i].default_i_set = 1;
       args[i].default_i = (int64_t)def->valuedouble;
     } else if (cJSON_IsString(def) && def->valuestring) {
-      args[i].default_s = strdup(def->valuestring);
+      args[i].default_s = yai_strdup0(def->valuestring);
     }
   }
 
@@ -139,10 +161,28 @@ static int load_artifacts_io(cJSON* arr, yai_law_artifact_io_t** out_io, size_t*
   return 0;
 }
 
-static int load_artifacts_table(const char* path, yai_law_artifact_role_t** out, size_t* out_len, char** out_version, char** out_binary) {
+// ---------------------------- table loaders ----------------------------
+
+static void free_artifacts_roles_owned(yai_law_artifact_role_t* roles, size_t len) {
+  if (!roles) return;
+  for (size_t i = 0; i < len; i++) {
+    free((void*)roles[i].role);
+    free((void*)roles[i].schema_ref);
+    free((void*)roles[i].description);
+  }
+  free(roles);
+}
+
+static int load_artifacts_table(
+    const char* path,
+    yai_law_artifact_role_t** out,
+    size_t* out_len,
+    char** out_version,
+    char** out_binary)
+{
   *out = NULL; *out_len = 0;
   if (out_version) *out_version = NULL;
-  if (out_binary) *out_binary = NULL;
+  if (out_binary)  *out_binary  = NULL;
 
   char* txt = read_file_all(path);
   if (!txt) return ENOENT;
@@ -164,8 +204,8 @@ static int load_artifacts_table(const char* path, yai_law_artifact_role_t** out,
   for (int i = 0; i < n; i++) {
     cJSON* a = cJSON_GetArrayItem(arr, i);
     if (!cJSON_IsObject(a)) { free(roles); cJSON_Delete(root); return 4; }
-    roles[i].role = dup_json_str(a, "role");
-    roles[i].schema_ref = dup_json_str(a, "schema_ref");
+    roles[i].role        = dup_json_str(a, "role");
+    roles[i].schema_ref  = dup_json_str(a, "schema_ref");
     roles[i].description = dup_json_str(a, "description");
   }
 
@@ -175,10 +215,16 @@ static int load_artifacts_table(const char* path, yai_law_artifact_role_t** out,
   return 0;
 }
 
-static int load_commands_table(const char* path, yai_law_command_t** out, size_t* out_len, char** out_version, char** out_binary) {
+static int load_commands_table(
+    const char* path,
+    yai_law_command_t** out,
+    size_t* out_len,
+    char** out_version,
+    char** out_binary)
+{
   *out = NULL; *out_len = 0;
   if (out_version) *out_version = NULL;
-  if (out_binary) *out_binary = NULL;
+  if (out_binary)  *out_binary  = NULL;
 
   char* txt = read_file_all(path);
   if (!txt) return ENOENT;
@@ -201,24 +247,33 @@ static int load_commands_table(const char* path, yai_law_command_t** out, size_t
     cJSON* c = cJSON_GetArrayItem(arr, i);
     if (!cJSON_IsObject(c)) { free(cmds); cJSON_Delete(root); return 4; }
 
-    cmds[i].id = dup_json_str(c, "id");
-    cmds[i].name = dup_json_str(c, "name");
-    cmds[i].group = dup_json_str(c, "group");
+    cmds[i].id      = dup_json_str(c, "id");
+    cmds[i].name    = dup_json_str(c, "name");
+    cmds[i].group   = dup_json_str(c, "group");
     cmds[i].summary = dup_json_str(c, "summary");
 
-    (void)load_args_array(cJSON_GetObjectItemCaseSensitive(c, "args"), (yai_law_arg_t**)&cmds[i].args, &cmds[i].args_len);
+    (void)load_args_array(cJSON_GetObjectItemCaseSensitive(c, "args"),
+                          (yai_law_arg_t**)&cmds[i].args, &cmds[i].args_len);
 
-    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "outputs"), &cmds[i].outputs, &cmds[i].outputs_len);
-    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "side_effects"), &cmds[i].side_effects, &cmds[i].side_effects_len);
+    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "outputs"),
+                            &cmds[i].outputs, &cmds[i].outputs_len);
+    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "side_effects"),
+                            &cmds[i].side_effects, &cmds[i].side_effects_len);
 
-    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "law_hooks"), &cmds[i].law_hooks, &cmds[i].law_hooks_len);
-    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "law_invariants"), &cmds[i].law_invariants, &cmds[i].law_invariants_len);
-    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "law_boundaries"), &cmds[i].law_boundaries, &cmds[i].law_boundaries_len);
+    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "law_hooks"),
+                            &cmds[i].law_hooks, &cmds[i].law_hooks_len);
+    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "law_invariants"),
+                            &cmds[i].law_invariants, &cmds[i].law_invariants_len);
+    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "law_boundaries"),
+                            &cmds[i].law_boundaries, &cmds[i].law_boundaries_len);
 
-    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "uses_primitives"), &cmds[i].uses_primitives, &cmds[i].uses_primitives_len);
+    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "uses_primitives"),
+                            &cmds[i].uses_primitives, &cmds[i].uses_primitives_len);
 
-    (void)load_artifacts_io(cJSON_GetObjectItemCaseSensitive(c, "emits_artifacts"), (yai_law_artifact_io_t**)&cmds[i].emits_artifacts, &cmds[i].emits_artifacts_len);
-    (void)load_artifacts_io(cJSON_GetObjectItemCaseSensitive(c, "consumes_artifacts"), (yai_law_artifact_io_t**)&cmds[i].consumes_artifacts, &cmds[i].consumes_artifacts_len);
+    (void)load_artifacts_io(cJSON_GetObjectItemCaseSensitive(c, "emits_artifacts"),
+                            (yai_law_artifact_io_t**)&cmds[i].emits_artifacts, &cmds[i].emits_artifacts_len);
+    (void)load_artifacts_io(cJSON_GetObjectItemCaseSensitive(c, "consumes_artifacts"),
+                            (yai_law_artifact_io_t**)&cmds[i].consumes_artifacts, &cmds[i].consumes_artifacts_len);
   }
 
   cJSON_Delete(root);
@@ -226,6 +281,8 @@ static int load_commands_table(const char* path, yai_law_command_t** out, size_t
   *out_len = (size_t)n;
   return 0;
 }
+
+// ---------------------------- free owned ----------------------------
 
 static void free_string_array_owned(const char** items, size_t len) {
   if (!items) return;
@@ -254,6 +311,8 @@ static void free_artifacts_io_owned(const yai_law_artifact_io_t* io, size_t len)
   }
   free((void*)io);
 }
+
+// ---------------------------- public API ----------------------------
 
 void yai_law_registry_cache_init(yai_law_registry_cache_t* cache) {
   if (!cache) return;
@@ -293,13 +352,8 @@ void yai_law_registry_cache_free(yai_law_registry_cache_t* cache) {
   }
 
   if (cache->registry.artifacts) {
-    for (size_t i = 0; i < cache->registry.artifacts_len; i++) {
-      yai_law_artifact_role_t* a = (yai_law_artifact_role_t*)&cache->registry.artifacts[i];
-      free((void*)a->role);
-      free((void*)a->schema_ref);
-      free((void*)a->description);
-    }
-    free((void*)cache->registry.artifacts);
+    free_artifacts_roles_owned((yai_law_artifact_role_t*)cache->registry.artifacts,
+                              cache->registry.artifacts_len);
   }
 
   free((void*)cache->registry.version);
@@ -335,12 +389,17 @@ int yai_law_registry_cache_load_from_files(
   rc = load_commands_table(commands_json_path, &cmds, &cmds_len, &cv, &cb);
   if (rc != 0) {
     free(av); free(ab);
-    free(roles);
+    free_artifacts_roles_owned(roles, roles_len);
     return rc;
   }
 
+  // Prefer commands header; fallback to artifacts header.
   cache->registry.version = cv ? cv : av;
   cache->registry.binary  = cb ? cb : ab;
+
+  // Prevent leaks of the unused header strings.
+  if (cv && av) free(av);
+  if (cb && ab) free(ab);
 
   cache->registry.commands = cmds;
   cache->registry.commands_len = cmds_len;
@@ -353,7 +412,7 @@ int yai_law_registry_cache_load_from_files(
 }
 
 int yai_law_registry_cache_load(yai_law_registry_cache_t* cache) {
-  if (!cache) return 1;
+  if (!cache) return EINVAL;
   if (cache->loaded) return 0;
 
   yai_law_paths_t p;
