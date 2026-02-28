@@ -31,6 +31,7 @@ LIB := $(LIB_DIR)/libyai_sdk.a
 
 SRCS := \
   src/rpc/rpc_client.c \
+    src/platform/paths.c \
   src/registry/registry.c \
   src/registry/registry_help.c \
   src/registry/registry_paths.c \
