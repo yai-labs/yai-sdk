@@ -23,6 +23,7 @@ CFLAGS += -I$(ROOT_DIR)/third_party/cjson
 
 # Expose the SDK repo root to C code (used to resolve deps/yai-law reliably)
 CFLAGS += -DYAI_SDK_ROOT=\"$(ROOT_DIR)\"
+CFLAGS += -D_POSIX_C_SOURCE=200809L
 
 AR ?= ar
 ARFLAGS ?= rcs
