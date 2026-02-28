@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   # 1. Il poliziotto controlla i documenti
   integrity-check:
-    uses: yai-labs/yai-infra/.github/workflows/audit-integrity.yml@main
+    uses: yai-labs/yai-infra/.github/workflows/reusable-audit.yml@main
 
   # 2. La build parte solo se i documenti sono in regola
   build:
