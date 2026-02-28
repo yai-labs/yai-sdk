@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-// src/runtime/rpc_client.c
+// src/rpc/rpc_client.c
 
 #define _POSIX_C_SOURCE 200809L
 
@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <ctype.h>
 
 /* ============================================================
    INTERNAL IO (STRICT)
@@ -29,13 +30,17 @@ static int write_all(int fd, const void *buf, size_t n)
     const uint8_t *p = (const uint8_t *)buf;
     size_t off = 0;
 
-    while (off < n) {
+    while (off < n)
+    {
         ssize_t w = write(fd, p + off, n - off);
-        if (w < 0) {
-            if (errno == EINTR) continue;
+        if (w < 0)
+        {
+            if (errno == EINTR)
+                continue;
             return -1;
         }
-        if (w == 0) return -1;
+        if (w == 0)
+            return -1;
         off += (size_t)w;
     }
     return 0;
@@ -46,13 +51,17 @@ static int read_all(int fd, void *buf, size_t n)
     uint8_t *p = (uint8_t *)buf;
     size_t off = 0;
 
-    while (off < n) {
+    while (off < n)
+    {
         ssize_t r = read(fd, p + off, n - off);
-        if (r < 0) {
-            if (errno == EINTR) continue;
+        if (r < 0)
+        {
+            if (errno == EINTR)
+                continue;
             return -1;
         }
-        if (r == 0) return -1; /* EOF */
+        if (r == 0)
+            return -1; /* EOF */
         off += (size_t)r;
     }
     return 0;
@@ -60,22 +69,42 @@ static int read_all(int fd, void *buf, size_t n)
 
 /* ============================================================
    WS_ID VALIDATION (STRICT, PATH-SAFE)
+   - must fit envelope ws_id field (typically 36 bytes incl NUL)
+   - allow: [A-Za-z0-9_-]
    ============================================================ */
 
 static int is_valid_ws_id(const char *ws_id)
 {
-    if (!ws_id || !ws_id[0]) return 0;
+    if (!ws_id || !ws_id[0])
+        return 0;
 
-    /* forbid traversal / separators */
-    if (strchr(ws_id, '/')) return 0;
-    if (ws_id[0] == '~') return 0;
-    if (strstr(ws_id, "..")) return 0;
+    /* forbid traversal / separators / shortcuts */
+    if (strchr(ws_id, '/'))
+        return 0;
+    if (ws_id[0] == '~')
+        return 0;
+    if (strstr(ws_id, ".."))
+        return 0;
+
+    /* allow only safe charset; enforce max length */
+    size_t n = 0;
+    for (const char *p = ws_id; *p; p++)
+    {
+        unsigned char c = (unsigned char)*p;
+        if (!(isalnum(c) || c == '_' || c == '-'))
+            return 0;
+        n++;
+        /* envelope ws_id is usually 36 bytes -> 35 chars max */
+        if (n > 35)
+            return 0;
+    }
 
     return 1;
 }
 
 /* ============================================================
    TRACE ID (deterministic enough for local debug)
+   NOTE: envelope trace_id is typically 36 bytes -> keep short
    ============================================================ */
 
 static void set_trace_id(yai_rpc_envelope_t *env)
@@ -83,9 +112,10 @@ static void set_trace_id(yai_rpc_envelope_t *env)
     static uint32_t ctr = 0;
     ctr++;
 
+    /* keep within ~35 chars */
     char tmp[64];
-    snprintf(tmp, sizeof(tmp), "cli-%ld-%u", (long)getpid(), ctr);
-    snprintf(env->trace_id, sizeof(env->trace_id), "%s", tmp);
+    (void)snprintf(tmp, sizeof(tmp), "cli-%ld-%u", (long)getpid(), ctr);
+    (void)snprintf(env->trace_id, sizeof(env->trace_id), "%s", tmp);
 }
 
 /* ============================================================
@@ -94,8 +124,10 @@ static void set_trace_id(yai_rpc_envelope_t *env)
 
 int yai_rpc_connect(yai_rpc_client_t *c, const char *ws_id)
 {
-    if (!c) return -1;
-    if (!is_valid_ws_id(ws_id)) return -99;
+    if (!c)
+        return -1;
+    if (!is_valid_ws_id(ws_id))
+        return -99;
 
     memset(c, 0, sizeof(*c));
     c->fd = -1;
@@ -111,12 +143,16 @@ int yai_rpc_connect(yai_rpc_client_t *c, const char *ws_id)
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
+
+    /* strict: ensure NUL termination */
     strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
+    addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
 
     socklen_t len =
         (socklen_t)(offsetof(struct sockaddr_un, sun_path) + strlen(addr.sun_path));
 
-    if (connect(fd, (struct sockaddr *)&addr, len) < 0) {
+    if (connect(fd, (struct sockaddr *)&addr, len) < 0)
+    {
         close(fd);
         return -5;
     }
@@ -126,7 +162,8 @@ int yai_rpc_connect(yai_rpc_client_t *c, const char *ws_id)
     strncpy(c->ws_id, ws_id, sizeof(c->ws_id) - 1);
     c->ws_id[sizeof(c->ws_id) - 1] = '\0';
 
-    c->role   = YAI_ROLE_NONE;
+    /* default authority (explicitly NONE) */
+    c->role = YAI_ROLE_NONE;
     c->arming = 0;
 
     return 0;
@@ -134,7 +171,8 @@ int yai_rpc_connect(yai_rpc_client_t *c, const char *ws_id)
 
 void yai_rpc_close(yai_rpc_client_t *c)
 {
-    if (c && c->fd >= 0) {
+    if (c && c->fd >= 0)
+    {
         close(c->fd);
         c->fd = -1;
     }
@@ -146,23 +184,34 @@ void yai_rpc_close(yai_rpc_client_t *c)
 
 void yai_rpc_set_authority(yai_rpc_client_t *c, int arming, const char *role_str)
 {
-    if (!c) return;
+    if (!c)
+        return;
 
     c->arming = arming ? 1 : 0;
 
-    if (!role_str || !role_str[0]) {
+    if (!role_str || !role_str[0])
+    {
         c->role = YAI_ROLE_NONE;
         return;
     }
 
     if (strcmp(role_str, "operator") == 0)
+    {
         c->role = YAI_ROLE_OPERATOR;
+    }
     else if (strcmp(role_str, "system") == 0)
+    {
         c->role = YAI_ROLE_SYSTEM;
+    }
     else if (strcmp(role_str, "user") == 0)
+    {
+        /* only if your roles.h defines it; otherwise drop this branch */
         c->role = YAI_ROLE_USER;
+    }
     else
+    {
         c->role = YAI_ROLE_NONE;
+    }
 }
 
 /* ============================================================
@@ -178,30 +227,34 @@ int yai_rpc_call_raw(
     size_t out_cap,
     uint32_t *out_len)
 {
-    if (!c || c->fd < 0) return -1;
-    if (payload_len > 0 && !payload) return -2;
+    if (!c || c->fd < 0)
+        return -1;
+    if (payload_len > 0 && !payload)
+        return -2;
 
     yai_rpc_envelope_t env;
     memset(&env, 0, sizeof(env));
 
-    env.magic       = YAI_FRAME_MAGIC;
-    env.version     = YAI_PROTOCOL_IDS_VERSION;
-    env.command_id  = command_id;
+    env.magic = YAI_FRAME_MAGIC;
+    env.version = YAI_PROTOCOL_IDS_VERSION;
+    env.command_id = command_id;
     env.payload_len = payload_len;
 
-    env.role        = c->role;
-    env.arming      = c->arming;
+    /* AUTHORITY (THIS IS THE FIX) */
+    env.role = c->role;
+    env.arming = c->arming;
 
     /* reserved; keep deterministic */
-    env.checksum    = 0;
+    env.checksum = 0;
 
-    snprintf(env.ws_id, sizeof(env.ws_id), "%s", c->ws_id);
+    (void)snprintf(env.ws_id, sizeof(env.ws_id), "%s", c->ws_id);
     set_trace_id(&env);
 
     if (write_all(c->fd, &env, sizeof(env)) != 0)
         return -3;
 
-    if (payload_len > 0) {
+    if (payload_len > 0)
+    {
         if (write_all(c->fd, payload, payload_len) != 0)
             return -4;
     }
@@ -221,13 +274,16 @@ int yai_rpc_call_raw(
     if (resp.payload_len > (uint32_t)out_cap)
         return -8;
 
-    if (resp.payload_len > 0) {
-        if (!out_buf) return -9;
+    if (resp.payload_len > 0)
+    {
+        if (!out_buf)
+            return -9;
         if (read_all(c->fd, out_buf, resp.payload_len) != 0)
             return -10;
     }
 
-    if (out_len) *out_len = resp.payload_len;
+    if (out_len)
+        *out_len = resp.payload_len;
     return 0;
 }
 
@@ -237,13 +293,14 @@ int yai_rpc_call_raw(
 
 int yai_rpc_handshake(yai_rpc_client_t *c)
 {
-    if (!c || c->fd < 0) return -1;
+    if (!c || c->fd < 0)
+        return -1;
 
     yai_handshake_req_t req;
     memset(&req, 0, sizeof(req));
     req.client_version = YAI_PROTOCOL_IDS_VERSION;
     req.capabilities_requested = 0;
-    snprintf(req.client_name, sizeof(req.client_name), "%s", "yai-cli");
+    (void)snprintf(req.client_name, sizeof(req.client_name), "%s", "yai-cli");
 
     yai_handshake_ack_t ack;
     memset(&ack, 0, sizeof(ack));
@@ -257,13 +314,16 @@ int yai_rpc_handshake(yai_rpc_client_t *c)
         (uint32_t)sizeof(req),
         &ack,
         sizeof(ack),
-        &out_len
-    );
+        &out_len);
 
-    if (rc != 0) return rc;
-    if (out_len != sizeof(ack)) return -20;
-    if (ack.server_version != YAI_PROTOCOL_IDS_VERSION) return -21;
-    if (ack.status != YAI_PROTO_STATE_READY) return -22;
+    if (rc != 0)
+        return rc;
+    if (out_len != (uint32_t)sizeof(ack))
+        return -20;
+    if (ack.server_version != YAI_PROTOCOL_IDS_VERSION)
+        return -21;
+    if (ack.status != YAI_PROTO_STATE_READY)
+        return -22;
 
     return 0;
 }
