@@ -1,11 +1,11 @@
-# YAI SDK Surface Contract (v0)
+# YAI SDK Surface Contract (v1)
 
 Status: Foundation / Public API  
 Scope: `yai-sdk` public C API used by `yai-cli` and external consumers.
 
 ## Rule 0 — Single include
 Consumers MUST include only:
-- `#include <yai_sdk/yai.h>`
+- `#include <yai_sdk/public.h>`
 
 Direct inclusion of sub-headers is considered “advanced use” and is NOT covered by the compatibility contract unless explicitly documented.
 
@@ -19,7 +19,7 @@ Compatible changes (no major bump):
 - Bug fixes that preserve documented return-code semantics.
 
 Breaking changes (major bump):
-- Removing/renaming any function/type/macro included by `yai_sdk/yai.h`.
+- Removing/renaming any function/type/macro included by `yai_sdk/public.h`.
 - Changing semantics of return codes for documented operations.
 - Changing struct layout/types exposed by `yai_sdk/yai.h`.
 
@@ -32,8 +32,8 @@ Breaking changes (major bump):
 
 Any CLI-facing operation MUST honor this mapping.
 
-## Public modules (v0)
-The following modules are included in `yai_sdk/yai.h` and are public:
+## Public modules (v1)
+The following modules are included in `yai_sdk/public.h` and are public:
 
 - Errors: `yai_sdk/errors.h`
 - Paths: `yai_sdk/paths.h`
@@ -41,6 +41,12 @@ The following modules are included in `yai_sdk/yai.h` and are public:
 - Executor: `yai_sdk/ops/executor.h`
 - Dispatch: `yai_sdk/ops/ops_dispatch.h`
 - RPC client: `yai_sdk/rpc/rpc.h`
+
+ABI anchors:
+- `YAI_SDK_ABI_VERSION`
+- `yai_sdk_abi_version()`
+- `yai_sdk_version()`
+- `yai_sdk_errstr()`
 
 ## Opaque handles rule
 When an API needs state that may change, the public surface MUST use opaque handles (`typedef struct yai_xxx yai_xxx_t;`) and provide create/destroy functions.

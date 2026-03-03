@@ -33,9 +33,9 @@ int yai_sdk_execute(const yai_exec_request_t *req, yai_exec_result_t *out)
   {
     set_out(out, 0, NULL);
   }
-  else if (rc == ENOTCONN)
+  else if (rc == ENOTCONN || rc == YAI_SDK_SERVER_OFF)
   {
-    set_out(out, rc, "yai-sdk: server unavailable");
+    set_out(out, YAI_SDK_SERVER_OFF, "yai-sdk: server unavailable");
   }
   else if (rc == YAI_SDK_RUNTIME_NOT_READY)
   {
@@ -44,6 +44,10 @@ int yai_sdk_execute(const yai_exec_request_t *req, yai_exec_result_t *out)
   else if (rc == YAI_SDK_BAD_ARGS)
   {
     set_out(out, rc, "yai-sdk: invalid arguments");
+  }
+  else if (rc == YAI_SDK_NYI)
+  {
+    set_out(out, rc, "yai-sdk: command registered but not implemented");
   }
   else
   {
