@@ -28,6 +28,7 @@ CFLAGS ?= -Wall -Wextra -O2 -std=c11 -MMD -MP
 CFLAGS += -I$(ROOT_DIR)/include -I$(ROOT_DIR)/third_party/cjson
 CFLAGS += -I$(LAW_INC_PROTOCOL) -I$(LAW_INC_VAULT) -I$(LAW_INC_RUNTIME)
 CFLAGS += -DYAI_LAW_ROOT=\"$(YAI_LAW_ROOT)\" -D_POSIX_C_SOURCE=200809L
+CFLAGS += -DYAI_SDK_VERSION_STR=\"$(shell cat VERSION)\"
 
 # --- DEFINIZIONE ARTEFATTI (FIX #2) ---
 SDK_LIB      := $(LIB_DIR)/libyai_sdk.a
@@ -41,6 +42,7 @@ SRCS_PROTOCOL := \
 
 # Sorgenti dell'SDK (High Level API)
 SRCS_SDK := \
+  src/sdk_public.c \
   src/platform/paths.c \
   src/registry/registry.c \
   src/registry/registry_help.c \
@@ -56,6 +58,8 @@ OBJS_PROTOCOL := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS_PROTOCOL))
 OBJS_SDK      := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS_SDK))
 ALL_OBJS      := $(OBJS_PROTOCOL) $(OBJS_SDK)
 DEPS          := $(ALL_OBJS:.o=.d)
+
+TEST_BIN := $(BUILD_DIR)/tests/sdk_smoke
 
 # --- TARGETS ---
 .PHONY: all clean dirs test info libs
@@ -89,5 +93,13 @@ $(BUILD_DIR)/%.o: %.c | dirs
 
 clean:
 	@rm -rf $(BUILD_DIR) $(LIB_DIR)
+
+test: $(TEST_BIN)
+	@echo "[RUN] $<"
+	@$<
+
+$(TEST_BIN): tests/sdk_smoke.c $(SDK_LIB) | dirs
+	@echo "[CC] $<"
+	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
 
 -include $(DEPS)

@@ -6,12 +6,18 @@
 #include "yai_sdk/errors.h"
 #include "yai_sdk/rpc/rpc.h"
 
+#include <cJSON.h>
 #include <yai_protocol_ids.h>
 
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#ifndef YAI_CMD_CONTROL_CALL
+#define YAI_CMD_CONTROL_CALL 0x0105u
+#endif
 
 typedef int (*yai_ops_fn_t)(int argc, char **argv);
 
@@ -122,6 +128,108 @@ static int rpc_call_ping(const char *ws_id)
     return 0;
 }
 
+static int map_control_error_code(const char *code)
+{
+    if (!code || !code[0])
+        return YAI_SDK_PROTOCOL;
+
+    if (strcmp(code, "OK") == 0)
+        return YAI_SDK_OK;
+    if (strcmp(code, "NOT_IMPLEMENTED") == 0)
+        return YAI_SDK_NYI;
+    if (strcmp(code, "BAD_ARGS") == 0)
+        return YAI_SDK_BAD_ARGS;
+    if (strcmp(code, "UNAUTHORIZED") == 0)
+        return YAI_SDK_UNAUTHORIZED;
+    if (strcmp(code, "INVALID_TARGET") == 0)
+        return YAI_SDK_BAD_ARGS;
+    return YAI_SDK_PROTOCOL;
+}
+
+static int rpc_call_control_call(const char *command_id, int argc, char **argv)
+{
+    yai_rpc_client_t c;
+    int rc = rpc_connect_and_handshake(&c, "default", /*arming=*/1, /*role_str=*/"operator");
+    if (rc != 0)
+    {
+        return (rc == ENOTCONN) ? YAI_SDK_SERVER_OFF : YAI_SDK_RUNTIME_NOT_READY;
+    }
+
+    cJSON *req = cJSON_CreateObject();
+    if (!req)
+    {
+        yai_rpc_close(&c);
+        return YAI_SDK_IO;
+    }
+    cJSON_AddStringToObject(req, "type", "yai.control.call.v1");
+    cJSON_AddStringToObject(req, "target_plane", "kernel");
+    cJSON_AddStringToObject(req, "command_id", command_id);
+    cJSON *argv_json = cJSON_AddArrayToObject(req, "argv");
+    for (int i = 0; i < argc; i++)
+    {
+        cJSON_AddItemToArray(argv_json, cJSON_CreateString(argv[i] ? argv[i] : ""));
+    }
+
+    char *payload = cJSON_PrintUnformatted(req);
+    cJSON_Delete(req);
+    if (!payload)
+    {
+        yai_rpc_close(&c);
+        return YAI_SDK_IO;
+    }
+
+    char out[2048];
+    memset(out, 0, sizeof(out));
+    uint32_t out_len = 0;
+
+    rc = yai_rpc_call_raw(
+        &c,
+        YAI_CMD_CONTROL_CALL,
+        payload,
+        (uint32_t)strlen(payload),
+        out,
+        sizeof(out) - 1,
+        &out_len);
+
+    yai_rpc_close(&c);
+    free(payload);
+
+    if (rc != 0)
+    {
+        return (rc == ENOTCONN) ? YAI_SDK_SERVER_OFF : YAI_SDK_RPC;
+    }
+
+    out[out_len < sizeof(out) ? out_len : sizeof(out) - 1] = '\0';
+    cJSON *resp = cJSON_Parse(out);
+    if (!resp)
+    {
+        return YAI_SDK_PROTOCOL;
+    }
+
+    const cJSON *status = cJSON_GetObjectItemCaseSensitive(resp, "status");
+    const cJSON *code = cJSON_GetObjectItemCaseSensitive(resp, "code");
+    int mapped = YAI_SDK_PROTOCOL;
+
+    if (cJSON_IsString(status) && status->valuestring)
+    {
+        if (strcmp(status->valuestring, "ok") == 0)
+        {
+            mapped = YAI_SDK_OK;
+        }
+        else if (strcmp(status->valuestring, "nyi") == 0)
+        {
+            mapped = YAI_SDK_NYI;
+        }
+        else if (strcmp(status->valuestring, "error") == 0)
+        {
+            mapped = map_control_error_code(cJSON_IsString(code) ? code->valuestring : NULL);
+        }
+    }
+
+    cJSON_Delete(resp);
+    return mapped;
+}
+
 /* --------------------------------------------------------------------------
  * Bootstrap handlers (minimal, but REAL RPC)
  * -------------------------------------------------------------------------- */
@@ -202,7 +310,6 @@ int yai_ops_dispatch_by_id(const char *command_id, int argc, char **argv)
         }
     }
 
-    /* 2) unmapped */
-    fprintf(stderr, "yai-sdk: command id not mapped to an ops handler yet\n");
-    return 2;
+    /* 2) unmapped -> generic deterministic control.call path */
+    return rpc_call_control_call(command_id, argc, argv);
 }

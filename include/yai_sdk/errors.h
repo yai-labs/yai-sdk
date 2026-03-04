@@ -24,11 +24,16 @@ typedef enum
 
     /* runtime not ready (handshake fail / not ready state) */
     YAI_SDK_RUNTIME_NOT_READY = 4,
+    YAI_SDK_UNAUTHORIZED = 5,
+    YAI_SDK_NYI = 6,
 
     /* internal classes (still non-zero) */
     YAI_SDK_IO = 10,
     YAI_SDK_RPC = 20,
     YAI_SDK_PROTOCOL = 30,
+
+    /* deterministic offline/unavailable */
+    YAI_SDK_SERVER_OFF = 107,
 
     YAI_SDK_NOT_IMPLEMENTED = 99
 } yai_sdk_err_t;
@@ -49,17 +54,26 @@ static inline const char *yai_sdk_err_str(yai_sdk_err_t code)
         return "deps_missing";
     case YAI_SDK_RUNTIME_NOT_READY:
         return "runtime_not_ready";
+    case YAI_SDK_UNAUTHORIZED:
+        return "unauthorized";
+    case YAI_SDK_NYI:
+        return "nyi";
     case YAI_SDK_IO:
         return "io";
     case YAI_SDK_RPC:
         return "rpc";
     case YAI_SDK_PROTOCOL:
         return "protocol";
+    case YAI_SDK_SERVER_OFF:
+        return "server_off";
     case YAI_SDK_NOT_IMPLEMENTED:
         return "not_implemented";
     default:
         return "unknown";
     }
 }
+
+/* Stable ABI symbol (implemented in src/sdk_public.c). */
+const char *yai_sdk_errstr(yai_sdk_err_t code);
 
 #endif
