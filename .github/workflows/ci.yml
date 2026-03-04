@@ -3,17 +3,21 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  # 1. Il poliziotto controlla i documenti
   integrity-check:
-    uses: yai-labs/yai-infra/.github/workflows/reusable-audit.yml@main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate yai-law pin format
+        run: |
+          test -f deps/yai-law.ref
+          grep -E '^law_sha=[0-9a-f]{40}$' deps/yai-law.ref
 
-  # 2. La build parte solo se i documenti sono in regola
   build:
     needs: integrity-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - name: Build
         run: make
+      - name: Test
+        run: make test
