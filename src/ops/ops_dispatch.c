@@ -146,10 +146,11 @@ static int map_control_error_code(const char *code)
     return YAI_SDK_PROTOCOL;
 }
 
-static int rpc_call_control_call(const char *command_id, int argc, char **argv)
+static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, int argc, char **argv)
 {
     yai_rpc_client_t c;
-    int rc = rpc_connect_and_handshake(&c, "default", /*arming=*/1, /*role_str=*/"operator");
+    const char *resolved_ws = (ws_id && ws_id[0]) ? ws_id : "default";
+    int rc = rpc_connect_and_handshake(&c, resolved_ws, /*arming=*/1, /*role_str=*/"operator");
     if (rc != 0)
     {
         return (rc == ENOTCONN) ? YAI_SDK_SERVER_OFF : YAI_SDK_RUNTIME_NOT_READY;
@@ -230,6 +231,11 @@ static int rpc_call_control_call(const char *command_id, int argc, char **argv)
     return mapped;
 }
 
+static int rpc_call_control_call(const char *command_id, int argc, char **argv)
+{
+    return rpc_call_control_call_ws("default", command_id, argc, argv);
+}
+
 /* --------------------------------------------------------------------------
  * Bootstrap handlers (minimal, but REAL RPC)
  * -------------------------------------------------------------------------- */
@@ -252,14 +258,31 @@ static int ops_kernel_ping(int argc, char **argv)
 
 static int ops_kernel_ws(int argc, char **argv)
 {
-    /* Not implemented in runtime yet: keep explicit. */
     if (argc < 1 || !argv || !argv[0])
     {
         fprintf(stderr, "yai-sdk: missing required arg 'action' (kernel ws)\n");
         return YAI_SDK_BAD_ARGS;
     }
-    fprintf(stderr, "yai-sdk: kernel ws not implemented in runtime yet (action=%s)\n", argv[0]);
-    return 2;
+    if (strcmp(argv[0], "create") != 0 &&
+        strcmp(argv[0], "reset") != 0 &&
+        strcmp(argv[0], "destroy") != 0)
+    {
+        fprintf(stderr, "yai-sdk: unsupported kernel ws action '%s'\n", argv[0]);
+        return YAI_SDK_BAD_ARGS;
+    }
+
+    const char *ws_id = "default";
+    for (int i = 1; i + 1 < argc; i++)
+    {
+        if ((strcmp(argv[i], "--ws-id") == 0 || strcmp(argv[i], "--ws") == 0) &&
+            argv[i + 1] && argv[i + 1][0])
+        {
+            ws_id = argv[i + 1];
+            break;
+        }
+    }
+
+    return rpc_call_control_call_ws(ws_id, "yai.kernel.ws", argc, argv);
 }
 
 static const yai_ops_entry_t kBootstrapMap[] = {
