@@ -1,0 +1,27 @@
+"type:docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+
+"type:ci":
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+
+"type:tooling":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tools/**"
+          - "compat/**"
+
+"type:migration":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "migration/**"
+          - "docs/migration/**"
+
+"type:governance":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "governance/**"
+          - "docs/governance/**"
