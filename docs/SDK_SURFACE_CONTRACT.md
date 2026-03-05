@@ -41,9 +41,6 @@ The following modules are included in `yai_sdk/public.h` and are public:
 - Registry: `yai_sdk/registry/*` (lookup/help/validate)
 - RPC client: `yai_sdk/rpc/rpc.h`
 
-Legacy note:
-- `yai_sdk/ops/*` remains available only for internal/backward compatibility and is not part of the recommended protocol-first surface.
-
 ABI anchors:
 - `YAI_SDK_ABI_VERSION`
 - `yai_sdk_abi_version()`

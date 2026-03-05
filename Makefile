@@ -37,7 +37,6 @@ PROTOCOL_LIB := $(LIB_DIR)/libruntime_protocol.a
 # Sorgenti del solo Protocollo (Internal Core)
 SRCS_PROTOCOL := \
   src/rpc/rpc_client.c \
-  src/ops/ops_dispatch_gen.c \
   third_party/cjson/cJSON.c
 
 # Sorgenti dell'SDK (High Level API)
@@ -52,9 +51,7 @@ SRCS_SDK := \
   src/registry/registry_cache.c \
   src/registry/registry_load.c \
   src/registry/registry_query.c \
-  src/registry/registry_validate.c \
-  src/ops/ops_dispatch.c \
-  src/ops/executor.c
+  src/registry/registry_validate.c
 
 OBJS_PROTOCOL := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS_PROTOCOL))
 OBJS_SDK      := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS_SDK))
