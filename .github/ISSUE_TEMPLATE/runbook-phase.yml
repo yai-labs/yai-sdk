@@ -1,0 +1,57 @@
+name: Runbook phase (legacy)
+description: Legacy form. Prefer `Phase issue (runbook execution)` for canonical PHASE workflow.
+title: "runbook: <RB-ID> — <phase> <short title>"
+labels: ["runbook"]
+body:
+  - type: input
+    id: rbid
+    attributes:
+      label: Runbook ID
+      placeholder: "RB-ROOT-HARDENING / RB-WORKSPACES-LIFECYCLE / ..."
+    validations:
+      required: true
+
+  - type: input
+    id: mpid
+    attributes:
+      label: Milestone Pack ID (optional)
+      placeholder: "MP-ROOT-HARDENING-0.1.3"
+    validations:
+      required: false
+
+  - type: textarea
+    id: phase
+    attributes:
+      label: Phase definition
+      placeholder: |
+        Phase:
+        - Inputs:
+        - Outputs:
+        - Done when:
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Files / areas touched
+      placeholder: |
+        - root/...
+        - kernel/...
+        - deps/yai-law/...
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Test matrix (minimum)
+      placeholder: |
+        Commands:
+        ```bash
+        ...
+        ```
+        Expected:
+        - ...
+    validations:
+      required: true
