@@ -5,15 +5,20 @@
 #include "yai_sdk/ops/ops_dispatch_gen.h"
 #include "yai_sdk/errors.h"
 #include "yai_sdk/rpc/rpc.h"
+#include "yai_sdk/paths.h"
 
 #include <cJSON.h>
 #include <yai_protocol_ids.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
 
 #ifndef YAI_CMD_CONTROL_CALL
 #define YAI_CMD_CONTROL_CALL 0x0105u
@@ -236,6 +241,66 @@ static int rpc_call_control_call(const char *command_id, int argc, char **argv)
     return rpc_call_control_call_ws("default", command_id, argc, argv);
 }
 
+static int runtime_is_up(const char *ws_id)
+{
+    yai_rpc_client_t c;
+    int rc = rpc_connect_and_handshake(&c, ws_id ? ws_id : "default", /*arming=*/1, /*role_str=*/"operator");
+    if (rc != 0)
+        return 0;
+    yai_rpc_close(&c);
+    return 1;
+}
+
+static int spawn_boot_detached(void)
+{
+    pid_t pid = fork();
+    if (pid < 0)
+        return YAI_SDK_IO;
+
+    if (pid == 0)
+    {
+        (void)setsid();
+        int devnull = open("/dev/null", O_RDWR);
+        if (devnull >= 0)
+        {
+            (void)dup2(devnull, STDIN_FILENO);
+            (void)dup2(devnull, STDOUT_FILENO);
+            (void)dup2(devnull, STDERR_FILENO);
+            if (devnull > STDERR_FILENO)
+                (void)close(devnull);
+        }
+
+        const char *env_boot = getenv("YAI_BOOT_BIN");
+        if (env_boot && env_boot[0])
+            execl(env_boot, env_boot, "--master", (char *)NULL);
+
+        execlp("yai-boot", "yai-boot", "--master", (char *)NULL);
+        execl("../yai/build/bin/yai-boot", "../yai/build/bin/yai-boot", "--master", (char *)NULL);
+        execl("../yai/dist/bin/yai-boot", "../yai/dist/bin/yai-boot", "--master", (char *)NULL);
+        _exit(127);
+    }
+
+    return 0;
+}
+
+static void terminate_stack_processes(void)
+{
+    (void)system("pkill -TERM -f yai-root-server >/dev/null 2>&1 || true");
+    (void)system("pkill -TERM -f yai-kernel >/dev/null 2>&1 || true");
+    (void)system("pkill -TERM -f yai-engine >/dev/null 2>&1 || true");
+    (void)system("pkill -TERM -f yai-boot >/dev/null 2>&1 || true");
+}
+
+static void sleep_ms(long ms)
+{
+    struct timespec ts;
+    ts.tv_sec = ms / 1000;
+    ts.tv_nsec = (ms % 1000) * 1000000L;
+    while (nanosleep(&ts, &ts) != 0 && errno == EINTR)
+    {
+    }
+}
+
 /* --------------------------------------------------------------------------
  * Bootstrap handlers (minimal, but REAL RPC)
  * -------------------------------------------------------------------------- */
@@ -285,10 +350,59 @@ static int ops_kernel_ws(int argc, char **argv)
     return rpc_call_control_call_ws(ws_id, "yai.kernel.ws", argc, argv);
 }
 
+static int ops_lifecycle_up(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+
+    if (runtime_is_up("default"))
+        return YAI_SDK_OK;
+
+    if (spawn_boot_detached() != 0)
+        return YAI_SDK_IO;
+
+    for (int i = 0; i < 50; i++)
+    {
+        if (runtime_is_up("default"))
+            return YAI_SDK_OK;
+        sleep_ms(100);
+    }
+
+    return YAI_SDK_RUNTIME_NOT_READY;
+}
+
+static int ops_lifecycle_down(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+
+    terminate_stack_processes();
+    sleep_ms(200);
+
+    char root_sock[512];
+    if (yai_path_root_sock(root_sock, sizeof(root_sock)) == 0)
+    {
+        (void)unlink(root_sock);
+    }
+
+    return YAI_SDK_OK;
+}
+
+static int ops_lifecycle_restart(int argc, char **argv)
+{
+    int rc = ops_lifecycle_down(argc, argv);
+    if (rc != 0)
+        return rc;
+    return ops_lifecycle_up(argc, argv);
+}
+
 static const yai_ops_entry_t kBootstrapMap[] = {
     {"yai.root.ping", ops_root_ping},
     {"yai.kernel.ping", ops_kernel_ping},
     {"yai.kernel.ws", ops_kernel_ws},
+    {"yai.lifecycle.up", ops_lifecycle_up},
+    {"yai.lifecycle.down", ops_lifecycle_down},
+    {"yai.lifecycle.restart", ops_lifecycle_restart},
 };
 
 static yai_ops_fn_t find_bootstrap(const char *command_id)
