@@ -51,16 +51,9 @@ int yai_sdk_execute(const yai_exec_request_t *req, yai_exec_result_t *out)
     msg_buf[0] = '\0';
 
   // Deterministic mapping + normalized message from status/code/reason.
-  if (rc == 0)
-  {
-    set_out(out, 0, NULL);
-  }
-  else
-  {
-    if (rc == ENOTCONN)
-      rc = YAI_SDK_SERVER_OFF;
-    set_out(out, rc, msg_buf[0] ? msg_buf : "yai-sdk: error");
-  }
+  if (rc == ENOTCONN)
+    rc = YAI_SDK_SERVER_OFF;
+  set_out(out, rc, msg_buf[0] ? msg_buf : "yai-sdk: error");
 
   return rc;
 }
