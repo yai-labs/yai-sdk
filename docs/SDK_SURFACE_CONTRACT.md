@@ -39,6 +39,7 @@ The following modules are included in `yai_sdk/public.h` and are public:
 - Paths: `yai_sdk/paths.h`
 - Protocol client: `yai_sdk/client.h`
 - Registry: `yai_sdk/registry/*` (lookup/help/validate)
+  - includes command catalog/index API (`command_catalog.h`)
 - RPC client: `yai_sdk/rpc/rpc.h`
 
 ABI anchors:
@@ -49,6 +50,16 @@ ABI anchors:
 
 ## Opaque handles rule
 When an API needs state that may change, the public surface MUST use opaque handles (`typedef struct yai_xxx yai_xxx_t;`) and provide create/destroy functions.
+
+## Registry Views
+
+SDK exposes a registry-derived command catalog view for consumers (CLI/UI):
+
+- `yai_sdk_command_catalog_load()`
+- `yai_sdk_command_catalog_find_group()`
+- `yai_sdk_command_catalog_find_command()`
+- `yai_sdk_command_catalog_find_by_id()`
+- `yai_sdk_command_catalog_free()`
 
 ## Evidence
 - `make test`

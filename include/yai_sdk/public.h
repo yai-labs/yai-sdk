@@ -29,6 +29,7 @@ const char *yai_sdk_version(void);
 
 /* ---- Registry (published surface) ---- */
 #include <yai_sdk/registry/registry.h>
+#include <yai_sdk/registry/command_catalog.h>
 #include <yai_sdk/registry/registry_help.h>
 #include <yai_sdk/registry/registry_validate.h>
 #include <yai_sdk/registry/registry_registry.h>

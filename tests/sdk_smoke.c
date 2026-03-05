@@ -25,9 +25,23 @@ int main(void)
 
   /* 1) Offline registry lookup must work */
   const yai_law_command_t *c = yai_law_cmd_by_id("yai.kernel.ws");
+  yai_sdk_command_catalog_t catalog = {0};
+  const yai_sdk_command_ref_t *catalog_cmd = NULL;
   if (!c)
   {
     fprintf(stderr, "sdk_smoke: registry lookup failed\n");
+    return 2;
+  }
+  if (yai_sdk_command_catalog_load(&catalog) != 0)
+  {
+    fprintf(stderr, "sdk_smoke: catalog load failed\n");
+    return 2;
+  }
+  catalog_cmd = yai_sdk_command_catalog_find_by_id(&catalog, "yai.root.ping");
+  if (!catalog_cmd)
+  {
+    fprintf(stderr, "sdk_smoke: catalog lookup failed for yai.root.ping\n");
+    yai_sdk_command_catalog_free(&catalog);
     return 2;
   }
 
@@ -59,6 +73,7 @@ int main(void)
     if (rc != 0)
     {
       fprintf(stderr, "sdk_smoke: online ping failed rc=%d\n", rc);
+      yai_sdk_command_catalog_free(&catalog);
       return 4;
     }
 
@@ -70,17 +85,20 @@ int main(void)
     {
       fprintf(stderr, "sdk_smoke: online call failed rc=%d code=%s reason=%s\n", rc, out.code, out.reason);
       yai_sdk_reply_free(&out);
+      yai_sdk_command_catalog_free(&catalog);
       return 5;
     }
     if (!out.exec_reply_json || !out.exec_reply_json[0])
     {
       fprintf(stderr, "sdk_smoke: expected exec reply json\n");
       yai_sdk_reply_free(&out);
+      yai_sdk_command_catalog_free(&catalog);
       return 6;
     }
     yai_sdk_reply_free(&out);
   }
 
+  yai_sdk_command_catalog_free(&catalog);
   printf("sdk_smoke: ok (abi=%d version=%s registry=%s, server_off_rc=%d)\n",
          yai_sdk_abi_version(), yai_sdk_version(), c->id, YAI_SDK_SERVER_OFF);
   return 0;

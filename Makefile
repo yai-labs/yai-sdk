@@ -46,6 +46,7 @@ SRCS_SDK := \
   src/client/client.c \
   src/protocol/reply_map.c \
   src/registry/registry.c \
+  src/registry/command_catalog.c \
   src/registry/registry_help.c \
   src/registry/registry_paths.c \
   src/registry/registry_cache.c \
@@ -59,6 +60,7 @@ ALL_OBJS      := $(OBJS_PROTOCOL) $(OBJS_SDK)
 DEPS          := $(ALL_OBJS:.o=.d)
 
 TEST_BIN := $(BUILD_DIR)/tests/sdk_smoke
+CATALOG_TEST_BIN := $(BUILD_DIR)/tests/catalog_smoke
 
 # --- TARGETS ---
 .PHONY: all clean dirs test info libs
@@ -93,11 +95,17 @@ $(BUILD_DIR)/%.o: %.c | dirs
 clean:
 	@rm -rf $(BUILD_DIR) $(LIB_DIR)
 
-test: $(TEST_BIN)
+test: $(TEST_BIN) $(CATALOG_TEST_BIN)
 	@echo "[RUN] $<"
 	@$<
+	@echo "[RUN] $(CATALOG_TEST_BIN)"
+	@$(CATALOG_TEST_BIN)
 
 $(TEST_BIN): tests/sdk_smoke.c $(SDK_LIB) | dirs
+	@echo "[CC] $<"
+	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
+
+$(CATALOG_TEST_BIN): tests/catalog_smoke.c $(SDK_LIB) | dirs
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
 
