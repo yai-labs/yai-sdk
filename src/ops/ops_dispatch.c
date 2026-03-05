@@ -12,6 +12,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +39,7 @@ static char g_last_reason[256] = "uninitialized";
 static char g_last_command_id[128] = "yai.unknown.unknown";
 static char g_last_trace_id[128] = "";
 static char g_last_target_plane[16] = "kernel";
+static char g_reason_buf[160];
 
 /* --------------------------------------------------------------------------
  * Helpers
@@ -72,23 +74,76 @@ static const char *infer_target_plane_from_command(const char *command_id)
     return "root";
 }
 
+static const char *reason_ok_for_command(const char *command_id)
+{
+    if (!command_id || !command_id[0])
+        return "command_completed";
+
+    if (strcmp(command_id, "yai.lifecycle.up") == 0)
+        return "lifecycle_up_started";
+    if (strcmp(command_id, "yai.lifecycle.down") == 0)
+        return "lifecycle_down_completed";
+    if (strcmp(command_id, "yai.lifecycle.restart") == 0)
+        return "lifecycle_restart_completed";
+    if (strcmp(command_id, "yai.root.ping") == 0)
+        return "root_ping_ok";
+    if (strcmp(command_id, "yai.kernel.ping") == 0)
+        return "kernel_ping_ok";
+
+    const char *last_dot = strrchr(command_id, '.');
+    const char *action = (last_dot && last_dot[1]) ? (last_dot + 1) : NULL;
+    if (!action || !action[0])
+        return "command_completed";
+
+    size_t j = 0;
+    for (size_t i = 0; action[i] && j + 4 < sizeof(g_reason_buf); i++)
+    {
+        unsigned char ch = (unsigned char)action[i];
+        if (isalnum(ch) || ch == '_')
+            g_reason_buf[j++] = (char)tolower(ch);
+        else if (ch == '-')
+            g_reason_buf[j++] = '_';
+        else
+            break;
+    }
+    if (j == 0)
+        return "command_completed";
+
+    g_reason_buf[j++] = '_';
+    g_reason_buf[j++] = 'o';
+    g_reason_buf[j++] = 'k';
+    g_reason_buf[j] = '\0';
+    return g_reason_buf;
+}
+
+static const char *reason_server_unavailable_for_command(const char *command_id)
+{
+    if (!command_id || !command_id[0])
+        return "server_unavailable";
+
+    if (strncmp(command_id, "yai.root.", 9) == 0 || strncmp(command_id, "yai.kernel.", 11) == 0)
+        return "root_socket_unreachable";
+
+    return "control_socket_unreachable";
+}
+
 static void set_last_reply_from_rc(int rc, const char *command_id)
 {
     const char *target_plane = infer_target_plane_from_command(command_id);
     if (rc == YAI_SDK_OK)
-        set_last_reply("ok", "OK", "ok", command_id, "", target_plane);
+        set_last_reply("ok", "OK", reason_ok_for_command(command_id), command_id, "", target_plane);
     else if (rc == YAI_SDK_NYI)
         set_last_reply("nyi", "NOT_IMPLEMENTED", "nyi_deterministic", command_id, "", target_plane);
     else if (rc == YAI_SDK_BAD_ARGS)
-        set_last_reply("error", "BAD_ARGS", "bad_args", command_id, "", target_plane);
+        set_last_reply("error", "BAD_ARGS", "command_args_invalid", command_id, "", target_plane);
     else if (rc == YAI_SDK_UNAUTHORIZED)
         set_last_reply("error", "UNAUTHORIZED", "unauthorized", command_id, "", target_plane);
     else if (rc == YAI_SDK_RUNTIME_NOT_READY)
-        set_last_reply("error", "RUNTIME_NOT_READY", "runtime_not_ready", command_id, "", target_plane);
+        set_last_reply("error", "RUNTIME_NOT_READY", "runtime_handshake_not_ready", command_id, "", target_plane);
     else if (rc == YAI_SDK_SERVER_OFF || rc == ENOTCONN)
-        set_last_reply("error", "SERVER_UNAVAILABLE", "server_unavailable", command_id, "", target_plane);
+        set_last_reply("error", "SERVER_UNAVAILABLE", reason_server_unavailable_for_command(command_id), command_id, "", target_plane);
     else
-        set_last_reply("error", "INTERNAL_ERROR", "failure", command_id, "", target_plane);
+        set_last_reply("error", "INTERNAL_ERROR", "internal_error", command_id, "", target_plane);
 }
 
 void yai_ops_last_reply(const char **status,
@@ -426,7 +481,10 @@ static int ops_root_ping(int argc, char **argv)
     (void)argc;
     (void)argv;
     /* Root validates ws_id. Keep deterministic default. */
-    return rpc_call_ping("default");
+    int rc = rpc_call_ping("default");
+    if (rc == 0)
+        set_last_reply("ok", "OK", "root_ping_ok", "yai.root.ping", "", "root");
+    return rc;
 }
 
 static int ops_kernel_ping(int argc, char **argv)
@@ -434,7 +492,10 @@ static int ops_kernel_ping(int argc, char **argv)
     (void)argc;
     (void)argv;
     /* Root forwards to kernel; kernel requires ws_id non-empty too. */
-    return rpc_call_ping("default");
+    int rc = rpc_call_ping("default");
+    if (rc == 0)
+        set_last_reply("ok", "OK", "kernel_ping_ok", "yai.kernel.ping", "", "kernel");
+    return rc;
 }
 
 static int ops_kernel_ws(int argc, char **argv)
@@ -466,7 +527,10 @@ static int ops_lifecycle_up(int argc, char **argv)
     (void)argv;
 
     if (runtime_is_up("default"))
+    {
+        set_last_reply("ok", "OK", "lifecycle_up_already_running", "yai.lifecycle.up", "", "root");
         return YAI_SDK_OK;
+    }
 
     if (spawn_boot_detached() != 0)
         return YAI_SDK_IO;
@@ -474,10 +538,14 @@ static int ops_lifecycle_up(int argc, char **argv)
     for (int i = 0; i < 50; i++)
     {
         if (runtime_is_up("default"))
+        {
+            set_last_reply("ok", "OK", "lifecycle_up_started", "yai.lifecycle.up", "", "root");
             return YAI_SDK_OK;
+        }
         sleep_ms(100);
     }
 
+    set_last_reply("error", "RUNTIME_NOT_READY", "lifecycle_up_timeout", "yai.lifecycle.up", "", "root");
     return YAI_SDK_RUNTIME_NOT_READY;
 }
 
@@ -495,6 +563,7 @@ static int ops_lifecycle_down(int argc, char **argv)
         (void)unlink(root_sock);
     }
 
+    set_last_reply("ok", "OK", "lifecycle_down_completed", "yai.lifecycle.down", "", "root");
     return YAI_SDK_OK;
 }
 
@@ -503,7 +572,10 @@ static int ops_lifecycle_restart(int argc, char **argv)
     int rc = ops_lifecycle_down(argc, argv);
     if (rc != 0)
         return rc;
-    return ops_lifecycle_up(argc, argv);
+    rc = ops_lifecycle_up(argc, argv);
+    if (rc == 0)
+        set_last_reply("ok", "OK", "lifecycle_restart_completed", "yai.lifecycle.restart", "", "root");
+    return rc;
 }
 
 static const yai_ops_entry_t kBootstrapMap[] = {
