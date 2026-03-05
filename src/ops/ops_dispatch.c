@@ -135,14 +135,6 @@ static int rpc_call_ping(const char *ws_id)
     int rc = rpc_connect_and_handshake(&c, ws_id, /*arming=*/1, /*role_str=*/"operator");
     if (rc != 0)
     {
-        if (rc == ENOTCONN)
-        {
-            fprintf(stderr, "yai-sdk: server unavailable (cannot connect root socket)\n");
-        }
-        else
-        {
-            fprintf(stderr, "yai-sdk: runtime not ready (handshake failed)\n");
-        }
         return rc;
     }
 
@@ -164,7 +156,6 @@ static int rpc_call_ping(const char *ws_id)
 
     if (rc != 0)
     {
-        fprintf(stderr, "yai-sdk: ping call failed (rc=%d)\n", rc);
         return rc;
     }
 
@@ -176,12 +167,9 @@ static int rpc_call_ping(const char *ws_id)
     /* If server returned an error JSON, make it a failing command. */
     if (is_error_payload(out))
     {
-        /* print payload as-is (machine-friendly) */
-        puts(out);
         return 2; /* invalid_arguments_or_contract_violation class */
     }
 
-    puts(out[0] ? out : "{\"status\":\"ok\"}");
     return 0;
 }
 
@@ -415,17 +403,11 @@ static int ops_kernel_ping(int argc, char **argv)
 static int ops_kernel_ws(int argc, char **argv)
 {
     if (argc < 1 || !argv || !argv[0])
-    {
-        fprintf(stderr, "yai-sdk: missing required arg 'action' (kernel ws)\n");
         return YAI_SDK_BAD_ARGS;
-    }
     if (strcmp(argv[0], "create") != 0 &&
         strcmp(argv[0], "reset") != 0 &&
         strcmp(argv[0], "destroy") != 0)
-    {
-        fprintf(stderr, "yai-sdk: unsupported kernel ws action '%s'\n", argv[0]);
         return YAI_SDK_BAD_ARGS;
-    }
 
     const char *ws_id = "default";
     for (int i = 1; i + 1 < argc; i++)
@@ -515,10 +497,7 @@ static yai_ops_fn_t find_bootstrap(const char *command_id)
 int yai_ops_dispatch_by_id(const char *command_id, int argc, char **argv)
 {
     if (!command_id || command_id[0] == '\0')
-    {
-        fprintf(stderr, "yai-sdk: missing command id\n");
         return YAI_SDK_BAD_ARGS;
-    }
 
     set_last_reply("error", "INTERNAL_ERROR", "dispatch_pending", command_id);
 
