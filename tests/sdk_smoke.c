@@ -7,14 +7,6 @@
 #include "yai_sdk/public.h"
 #include "yai_sdk/registry/registry_registry.h"
 
-static int is_error_payload(const char *s)
-{
-  if (!s)
-    return 0;
-  return (strstr(s, "\"status\":\"error\"") != NULL) ||
-         (strstr(s, "\"status\": \"error\"") != NULL);
-}
-
 int main(void)
 {
   (void)setenv("YAI_REGISTRY_DIR", "../yai-law", 1);
@@ -42,15 +34,15 @@ int main(void)
   /* 2) Deterministic server-off semantics (always) */
   (void)setenv("YAI_ROOT_SOCK", "/tmp/yai-root-sock-does-not-exist.sock", 1);
 
-  yai_exec_request_t req = {
-      .command_id = "yai.root.ping",
-      .argc = 0,
-      .argv = NULL,
-      .json_mode = 1,
+  yai_sdk_client_t *client = NULL;
+  yai_sdk_client_opts_t opts = {
+      .ws_id = "default",
+      .uds_path = NULL,
+      .arming = 1,
+      .role = "operator",
+      .auto_handshake = 1,
   };
-
-  yai_exec_result_t out = {0};
-  int rc = yai_sdk_execute(&req, &out);
+  int rc = yai_sdk_client_open(&client, &opts);
 
   if (rc != YAI_SDK_SERVER_OFF)
   {
@@ -63,21 +55,30 @@ int main(void)
   if (online && strcmp(online, "1") == 0)
   {
     (void)unsetenv("YAI_ROOT_SOCK"); /* use default path */
-    memset(&out, 0, sizeof(out));
-
-    rc = yai_sdk_execute(&req, &out);
+    rc = yai_sdk_client_open(&client, &opts);
     if (rc != 0)
     {
       fprintf(stderr, "sdk_smoke: online ping failed rc=%d\n", rc);
-      if (out.message)
-        fprintf(stderr, "sdk_smoke: msg=%s\n", out.message);
       return 4;
     }
-    if (out.message && is_error_payload(out.message))
+
+    const char *json = "{\"type\":\"yai.control.call.v1\",\"target_plane\":\"root\",\"command_id\":\"yai.root.ping\",\"argv\":[]}";
+    yai_sdk_reply_t out = {0};
+    rc = yai_sdk_client_call_json(client, json, &out);
+    yai_sdk_client_close(client);
+    if (rc != 0)
     {
-      fprintf(stderr, "sdk_smoke: online ping returned error payload: %s\n", out.message);
+      fprintf(stderr, "sdk_smoke: online call failed rc=%d code=%s reason=%s\n", rc, out.code, out.reason);
+      yai_sdk_reply_free(&out);
       return 5;
     }
+    if (!out.exec_reply_json || !out.exec_reply_json[0])
+    {
+      fprintf(stderr, "sdk_smoke: expected exec reply json\n");
+      yai_sdk_reply_free(&out);
+      return 6;
+    }
+    yai_sdk_reply_free(&out);
   }
 
   printf("sdk_smoke: ok (abi=%d version=%s registry=%s, server_off_rc=%d)\n",

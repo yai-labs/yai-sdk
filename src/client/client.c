@@ -1,0 +1,308 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+#include <yai_sdk/client.h>
+#include <yai_sdk/errors.h>
+
+#include "client_internal.h"
+#include "../protocol/reply_map.h"
+
+#include <cJSON.h>
+#include <yai_protocol_ids.h>
+
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+static void reply_zero(yai_sdk_reply_t *r)
+{
+    if (!r) {
+        return;
+    }
+    memset(r, 0, sizeof(*r));
+    snprintf(r->status, sizeof(r->status), "error");
+    snprintf(r->code, sizeof(r->code), "INTERNAL_ERROR");
+    snprintf(r->reason, sizeof(r->reason), "internal_error");
+    snprintf(r->command_id, sizeof(r->command_id), "yai.unknown.unknown");
+    snprintf(r->target_plane, sizeof(r->target_plane), "kernel");
+}
+
+static void reply_set(yai_sdk_reply_t *r,
+                      const char *status,
+                      const char *code,
+                      const char *reason,
+                      const char *command_id,
+                      const char *trace_id,
+                      const char *target_plane)
+{
+    if (!r) {
+        return;
+    }
+    snprintf(r->status, sizeof(r->status), "%s", (status && status[0]) ? status : "error");
+    snprintf(r->code, sizeof(r->code), "%s", (code && code[0]) ? code : "INTERNAL_ERROR");
+    snprintf(r->reason, sizeof(r->reason), "%s", (reason && reason[0]) ? reason : "internal_error");
+    snprintf(r->command_id, sizeof(r->command_id), "%s",
+             (command_id && command_id[0]) ? command_id : "yai.unknown.unknown");
+    snprintf(r->trace_id, sizeof(r->trace_id), "%s", (trace_id && trace_id[0]) ? trace_id : "");
+    snprintf(r->target_plane, sizeof(r->target_plane), "%s",
+             (target_plane && target_plane[0]) ? target_plane : "kernel");
+}
+
+static char *dup_bytes(const char *s, size_t n)
+{
+    char *out = (char *)malloc(n + 1);
+    if (!out) {
+        return NULL;
+    }
+    if (n) {
+        memcpy(out, s, n);
+    }
+    out[n] = '\0';
+    return out;
+}
+
+static void parse_command_id_from_request(const char *control_call_json, char *out, size_t out_sz)
+{
+    if (!out || out_sz == 0) {
+        return;
+    }
+    snprintf(out, out_sz, "yai.unknown.unknown");
+    if (!control_call_json || !control_call_json[0]) {
+        return;
+    }
+
+    cJSON *req = cJSON_Parse(control_call_json);
+    if (!req) {
+        return;
+    }
+    const cJSON *command_id = cJSON_GetObjectItemCaseSensitive(req, "command_id");
+    if (cJSON_IsString(command_id) && command_id->valuestring && command_id->valuestring[0]) {
+        snprintf(out, out_sz, "%s", command_id->valuestring);
+    }
+    cJSON_Delete(req);
+}
+
+int yai_sdk_client_open(yai_sdk_client_t **out, const yai_sdk_client_opts_t *opts)
+{
+    if (!out) {
+        return YAI_SDK_BAD_ARGS;
+    }
+    *out = NULL;
+
+    yai_sdk_client_t *c = (yai_sdk_client_t *)calloc(1, sizeof(*c));
+    if (!c) {
+        return YAI_SDK_IO;
+    }
+    c->rpc.fd = -1;
+    snprintf(c->ws_id, sizeof(c->ws_id), "%s",
+             (opts && opts->ws_id && opts->ws_id[0]) ? opts->ws_id : "default");
+    snprintf(c->role, sizeof(c->role), "%s",
+             (opts && opts->role && opts->role[0]) ? opts->role : "operator");
+    c->arming = (opts) ? (opts->arming ? 1 : 0) : 1;
+    c->auto_handshake = (opts) ? (opts->auto_handshake ? 1 : 0) : 1;
+
+    if (yai_rpc_connect(&c->rpc, c->ws_id) != 0) {
+        free(c);
+        return YAI_SDK_SERVER_OFF;
+    }
+    c->is_open = 1;
+    yai_rpc_set_authority(&c->rpc, c->arming, c->role);
+    *out = c;
+    return YAI_SDK_OK;
+}
+
+void yai_sdk_client_close(yai_sdk_client_t *c)
+{
+    if (!c) {
+        return;
+    }
+    if (c->is_open) {
+        yai_rpc_close(&c->rpc);
+    }
+    free(c);
+}
+
+int yai_sdk_client_set_authority(yai_sdk_client_t *c, int arming, const char *role)
+{
+    if (!c) {
+        return YAI_SDK_BAD_ARGS;
+    }
+    c->arming = arming ? 1 : 0;
+    snprintf(c->role, sizeof(c->role), "%s", (role && role[0]) ? role : "operator");
+    yai_rpc_set_authority(&c->rpc, c->arming, c->role);
+    return YAI_SDK_OK;
+}
+
+int yai_sdk_client_set_ws(yai_sdk_client_t *c, const char *ws_id)
+{
+    if (!c || !ws_id || !ws_id[0]) {
+        return YAI_SDK_BAD_ARGS;
+    }
+    yai_rpc_close(&c->rpc);
+    c->is_open = 0;
+    c->handshaken = 0;
+    snprintf(c->ws_id, sizeof(c->ws_id), "%s", ws_id);
+    if (yai_rpc_connect(&c->rpc, c->ws_id) != 0) {
+        return YAI_SDK_SERVER_OFF;
+    }
+    c->is_open = 1;
+    yai_rpc_set_authority(&c->rpc, c->arming, c->role);
+    return YAI_SDK_OK;
+}
+
+int yai_sdk_client_handshake(yai_sdk_client_t *c)
+{
+    if (!c || !c->is_open) {
+        return YAI_SDK_BAD_ARGS;
+    }
+    if (yai_rpc_handshake(&c->rpc) != 0) {
+        c->handshaken = 0;
+        return YAI_SDK_RUNTIME_NOT_READY;
+    }
+    c->handshaken = 1;
+    return YAI_SDK_OK;
+}
+
+int yai_sdk_client_call_json(yai_sdk_client_t *c, const char *control_call_json, yai_sdk_reply_t *out)
+{
+    char fallback_command_id[128];
+    if (!c || !control_call_json || !control_call_json[0] || !out) {
+        return YAI_SDK_BAD_ARGS;
+    }
+
+    reply_zero(out);
+    parse_command_id_from_request(control_call_json, fallback_command_id, sizeof(fallback_command_id));
+
+    if (c->auto_handshake && !c->handshaken) {
+        int hrc = yai_sdk_client_handshake(c);
+        if (hrc != 0) {
+            reply_set(out, "error", "RUNTIME_NOT_READY", "runtime_not_ready",
+                      fallback_command_id, "", "kernel");
+            return hrc;
+        }
+    }
+
+    char raw[4096];
+    uint32_t out_len = 0;
+    int rc = yai_rpc_call_raw(
+        &c->rpc,
+        YAI_CMD_CONTROL_CALL,
+        control_call_json,
+        (uint32_t)strlen(control_call_json),
+        raw,
+        sizeof(raw) - 1,
+        &out_len);
+
+    if (rc != 0) {
+        if (rc == -5) {
+            reply_set(out, "error", "SERVER_UNAVAILABLE", "server_unavailable",
+                      fallback_command_id, "", "kernel");
+            return YAI_SDK_SERVER_OFF;
+        }
+        reply_set(out, "error", "PROTOCOL_ERROR", "rpc_call_failed",
+                  fallback_command_id, "", "kernel");
+        return YAI_SDK_RPC;
+    }
+
+    if (out_len >= sizeof(raw)) {
+        out_len = (uint32_t)(sizeof(raw) - 1);
+    }
+    raw[out_len] = '\0';
+
+    out->exec_reply_json = dup_bytes(raw, out_len);
+    if (!out->exec_reply_json) {
+        reply_set(out, "error", "INTERNAL_ERROR", "alloc_failed",
+                  fallback_command_id, "", "kernel");
+        return YAI_SDK_IO;
+    }
+
+    cJSON *resp = cJSON_Parse(out->exec_reply_json);
+    if (!resp) {
+        reply_set(out, "error", "PROTOCOL_ERROR", "response_parse_failed",
+                  fallback_command_id, "", "kernel");
+        return YAI_SDK_PROTOCOL;
+    }
+
+    const cJSON *type = cJSON_GetObjectItemCaseSensitive(resp, "type");
+    const cJSON *status = cJSON_GetObjectItemCaseSensitive(resp, "status");
+    const cJSON *code = cJSON_GetObjectItemCaseSensitive(resp, "code");
+    const cJSON *reason = cJSON_GetObjectItemCaseSensitive(resp, "reason");
+    const cJSON *command_id = cJSON_GetObjectItemCaseSensitive(resp, "command_id");
+    const cJSON *trace_id = cJSON_GetObjectItemCaseSensitive(resp, "trace_id");
+    const cJSON *target_plane = cJSON_GetObjectItemCaseSensitive(resp, "target_plane");
+
+    if (!cJSON_IsString(type) || !type->valuestring ||
+        strcmp(type->valuestring, "yai.exec.reply.v1") != 0) {
+        cJSON_Delete(resp);
+        reply_set(out, "error", "PROTOCOL_ERROR", "bad_response_type",
+                  fallback_command_id, "", "kernel");
+        return YAI_SDK_PROTOCOL;
+    }
+
+    reply_set(out,
+              cJSON_IsString(status) ? status->valuestring : "error",
+              cJSON_IsString(code) ? code->valuestring : "PROTOCOL_ERROR",
+              cJSON_IsString(reason) ? reason->valuestring : "missing_reason",
+              cJSON_IsString(command_id) ? command_id->valuestring : fallback_command_id,
+              cJSON_IsString(trace_id) ? trace_id->valuestring : "",
+              cJSON_IsString(target_plane) ? target_plane->valuestring : "kernel");
+
+    cJSON_Delete(resp);
+    return yai_reply_map_rc(out->status, out->code);
+}
+
+int yai_sdk_client_ping(yai_sdk_client_t *c, const char *command_id, yai_sdk_reply_t *out)
+{
+    char buf[256];
+    uint32_t out_len = 0;
+    const char *cid = (command_id && command_id[0]) ? command_id : "yai.root.ping";
+    const char *reason = (strcmp(cid, "yai.kernel.ping") == 0) ? "kernel_ping_ok" : "root_ping_ok";
+    const char *plane = (strcmp(cid, "yai.kernel.ping") == 0) ? "kernel" : "root";
+    if (!c || !out) {
+        return YAI_SDK_BAD_ARGS;
+    }
+    reply_zero(out);
+
+    if (c->auto_handshake && !c->handshaken) {
+        int hrc = yai_sdk_client_handshake(c);
+        if (hrc != 0) {
+            reply_set(out, "error", "RUNTIME_NOT_READY", "runtime_not_ready", cid, "", plane);
+            return hrc;
+        }
+    }
+
+    int rc = yai_rpc_call_raw(&c->rpc, YAI_CMD_PING, NULL, 0, buf, sizeof(buf) - 1, &out_len);
+    if (rc != 0) {
+        if (rc == -5) {
+            reply_set(out, "error", "SERVER_UNAVAILABLE", "server_unavailable", cid, "", plane);
+            return YAI_SDK_SERVER_OFF;
+        }
+        reply_set(out, "error", "PROTOCOL_ERROR", "rpc_call_failed", cid, "", plane);
+        return YAI_SDK_RPC;
+    }
+    if (out_len >= sizeof(buf)) {
+        out_len = (uint32_t)(sizeof(buf) - 1);
+    }
+    buf[out_len] = '\0';
+    reply_set(out, "ok", "OK", reason, cid, "", plane);
+    {
+        char json[512];
+        int n = snprintf(json, sizeof(json),
+                         "{\"type\":\"yai.exec.reply.v1\",\"status\":\"%s\",\"code\":\"%s\",\"reason\":\"%s\",\"command_id\":\"%s\",\"target_plane\":\"%s\",\"trace_id\":\"\"}",
+                         out->status, out->code, out->reason, out->command_id, out->target_plane);
+        if (n > 0 && (size_t)n < sizeof(json)) {
+            out->exec_reply_json = dup_bytes(json, (size_t)n);
+        } else {
+            out->exec_reply_json = dup_bytes(buf, out_len);
+        }
+    }
+    return YAI_SDK_OK;
+}
+
+void yai_sdk_reply_free(yai_sdk_reply_t *r)
+{
+    if (!r) {
+        return;
+    }
+    free(r->exec_reply_json);
+    r->exec_reply_json = NULL;
+}

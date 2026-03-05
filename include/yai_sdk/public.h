@@ -24,15 +24,14 @@ const char *yai_sdk_version(void);
 /* ---- Platform paths ---- */
 #include <yai_sdk/paths.h>
 
+/* ---- Protocol-first client API ---- */
+#include <yai_sdk/client.h>
+
 /* ---- Registry (published surface) ---- */
 #include <yai_sdk/registry/registry.h>
 #include <yai_sdk/registry/registry_help.h>
 #include <yai_sdk/registry/registry_validate.h>
 #include <yai_sdk/registry/registry_registry.h>
-
-/* ---- Execution ---- */
-#include <yai_sdk/ops/executor.h>
-#include <yai_sdk/ops/ops_dispatch.h>
 
 /* ---- Transport ---- */
 #include <yai_sdk/rpc/rpc.h>

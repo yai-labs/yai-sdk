@@ -44,6 +44,8 @@ SRCS_PROTOCOL := \
 SRCS_SDK := \
   src/sdk_public.c \
   src/platform/paths.c \
+  src/client/client.c \
+  src/protocol/reply_map.c \
   src/registry/registry.c \
   src/registry/registry_help.c \
   src/registry/registry_paths.c \
