@@ -32,9 +32,61 @@ typedef struct
     yai_ops_fn_t fn;
 } yai_ops_entry_t;
 
+static char g_last_status[16] = "error";
+static char g_last_code[64] = "INTERNAL_ERROR";
+static char g_last_reason[256] = "uninitialized";
+static char g_last_command_id[128] = "yai.unknown.unknown";
+
 /* --------------------------------------------------------------------------
  * Helpers
  * -------------------------------------------------------------------------- */
+
+static void set_last_reply(const char *status,
+                           const char *code,
+                           const char *reason,
+                           const char *command_id)
+{
+    snprintf(g_last_status, sizeof(g_last_status), "%s", (status && status[0]) ? status : "error");
+    snprintf(g_last_code, sizeof(g_last_code), "%s", (code && code[0]) ? code : "INTERNAL_ERROR");
+    snprintf(g_last_reason, sizeof(g_last_reason), "%s", (reason && reason[0]) ? reason : "unknown");
+    snprintf(g_last_command_id,
+             sizeof(g_last_command_id),
+             "%s",
+             (command_id && command_id[0]) ? command_id : "yai.unknown.unknown");
+}
+
+static void set_last_reply_from_rc(int rc, const char *command_id)
+{
+    if (rc == YAI_SDK_OK)
+        set_last_reply("ok", "OK", "ok", command_id);
+    else if (rc == YAI_SDK_NYI)
+        set_last_reply("nyi", "NOT_IMPLEMENTED", "nyi_deterministic", command_id);
+    else if (rc == YAI_SDK_BAD_ARGS)
+        set_last_reply("error", "BAD_ARGS", "bad_args", command_id);
+    else if (rc == YAI_SDK_UNAUTHORIZED)
+        set_last_reply("error", "UNAUTHORIZED", "unauthorized", command_id);
+    else if (rc == YAI_SDK_RUNTIME_NOT_READY)
+        set_last_reply("error", "RUNTIME_NOT_READY", "runtime_not_ready", command_id);
+    else if (rc == YAI_SDK_SERVER_OFF || rc == ENOTCONN)
+        set_last_reply("error", "SERVER_UNAVAILABLE", "server_unavailable", command_id);
+    else
+        set_last_reply("error", "INTERNAL_ERROR", "failure", command_id);
+}
+
+void yai_ops_last_reply(const char **status,
+                        const char **code,
+                        const char **reason,
+                        const char **command_id)
+{
+    if (status)
+        *status = g_last_status;
+    if (code)
+        *code = g_last_code;
+    if (reason)
+        *reason = g_last_reason;
+    if (command_id)
+        *command_id = g_last_command_id;
+}
 
 static int is_error_payload(const char *s)
 {
@@ -147,7 +199,15 @@ static int map_control_error_code(const char *code)
     if (strcmp(code, "UNAUTHORIZED") == 0)
         return YAI_SDK_UNAUTHORIZED;
     if (strcmp(code, "INVALID_TARGET") == 0)
-        return YAI_SDK_BAD_ARGS;
+        return YAI_SDK_PROTOCOL;
+    if (strcmp(code, "RUNTIME_NOT_READY") == 0)
+        return YAI_SDK_RUNTIME_NOT_READY;
+    if (strcmp(code, "SERVER_UNAVAILABLE") == 0)
+        return YAI_SDK_SERVER_OFF;
+    if (strcmp(code, "PROTOCOL_ERROR") == 0)
+        return YAI_SDK_PROTOCOL;
+    if (strcmp(code, "INTERNAL_ERROR") == 0)
+        return YAI_SDK_PROTOCOL;
     return YAI_SDK_PROTOCOL;
 }
 
@@ -158,6 +218,14 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
     int rc = rpc_connect_and_handshake(&c, resolved_ws, /*arming=*/1, /*role_str=*/"operator");
     if (rc != 0)
     {
+        if (rc == ENOTCONN)
+        {
+            set_last_reply("error", "SERVER_UNAVAILABLE", "server_unavailable", command_id);
+        }
+        else
+        {
+            set_last_reply("error", "RUNTIME_NOT_READY", "runtime_not_ready", command_id);
+        }
         return (rc == ENOTCONN) ? YAI_SDK_SERVER_OFF : YAI_SDK_RUNTIME_NOT_READY;
     }
 
@@ -165,6 +233,7 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
     if (!req)
     {
         yai_rpc_close(&c);
+        set_last_reply("error", "INTERNAL_ERROR", "request_encode_failed", command_id);
         return YAI_SDK_IO;
     }
     cJSON_AddStringToObject(req, "type", "yai.control.call.v1");
@@ -181,6 +250,7 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
     if (!payload)
     {
         yai_rpc_close(&c);
+        set_last_reply("error", "INTERNAL_ERROR", "request_encode_failed", command_id);
         return YAI_SDK_IO;
     }
 
@@ -202,6 +272,10 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
 
     if (rc != 0)
     {
+        if (rc == ENOTCONN)
+            set_last_reply("error", "SERVER_UNAVAILABLE", "server_unavailable", command_id);
+        else
+            set_last_reply("error", "PROTOCOL_ERROR", "rpc_call_failed", command_id);
         return (rc == ENOTCONN) ? YAI_SDK_SERVER_OFF : YAI_SDK_RPC;
     }
 
@@ -209,12 +283,23 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
     cJSON *resp = cJSON_Parse(out);
     if (!resp)
     {
+        set_last_reply("error", "PROTOCOL_ERROR", "response_parse_failed", command_id);
         return YAI_SDK_PROTOCOL;
     }
 
+    const cJSON *type = cJSON_GetObjectItemCaseSensitive(resp, "type");
     const cJSON *status = cJSON_GetObjectItemCaseSensitive(resp, "status");
     const cJSON *code = cJSON_GetObjectItemCaseSensitive(resp, "code");
+    const cJSON *reason = cJSON_GetObjectItemCaseSensitive(resp, "reason");
+    const cJSON *reply_command_id = cJSON_GetObjectItemCaseSensitive(resp, "command_id");
     int mapped = YAI_SDK_PROTOCOL;
+
+    if (!cJSON_IsString(type) || !type->valuestring || strcmp(type->valuestring, "yai.exec.reply.v1") != 0)
+    {
+        cJSON_Delete(resp);
+        set_last_reply("error", "PROTOCOL_ERROR", "bad_response_type", command_id);
+        return YAI_SDK_PROTOCOL;
+    }
 
     if (cJSON_IsString(status) && status->valuestring)
     {
@@ -231,6 +316,12 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
             mapped = map_control_error_code(cJSON_IsString(code) ? code->valuestring : NULL);
         }
     }
+
+    set_last_reply(
+        cJSON_IsString(status) ? status->valuestring : "error",
+        cJSON_IsString(code) ? code->valuestring : "PROTOCOL_ERROR",
+        cJSON_IsString(reason) ? reason->valuestring : "missing_reason",
+        cJSON_IsString(reply_command_id) ? reply_command_id->valuestring : command_id);
 
     cJSON_Delete(resp);
     return mapped;
@@ -429,10 +520,17 @@ int yai_ops_dispatch_by_id(const char *command_id, int argc, char **argv)
         return YAI_SDK_BAD_ARGS;
     }
 
+    set_last_reply("error", "INTERNAL_ERROR", "dispatch_pending", command_id);
+
     /* 0) bootstrap first */
     yai_ops_fn_t bs = find_bootstrap(command_id);
     if (bs)
-        return bs(argc, argv);
+    {
+        int rc = bs(argc, argv);
+        if (strcmp(g_last_reason, "dispatch_pending") == 0)
+            set_last_reply_from_rc(rc, command_id);
+        return rc;
+    }
 
     /* 1) generated map */
     if (kOpsMapLen != 0 && kOpsMap)
@@ -442,11 +540,19 @@ int yai_ops_dispatch_by_id(const char *command_id, int argc, char **argv)
             const char *id = kOpsMap[i].id;
             if (id && strcmp(id, command_id) == 0)
             {
-                return kOpsMap[i].fn(argc, argv);
+                int rc = kOpsMap[i].fn(argc, argv);
+                if (strcmp(g_last_reason, "dispatch_pending") == 0)
+                    set_last_reply_from_rc(rc, command_id);
+                return rc;
             }
         }
     }
 
     /* 2) unmapped -> generic deterministic control.call path */
-    return rpc_call_control_call(command_id, argc, argv);
+    {
+        int rc = rpc_call_control_call(command_id, argc, argv);
+        if (strcmp(g_last_reason, "dispatch_pending") == 0)
+            set_last_reply_from_rc(rc, command_id);
+        return rc;
+    }
 }
