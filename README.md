@@ -23,8 +23,8 @@ It is a governed consumer of pinned law.
 
 `yai-sdk` provides:
 - registry-aware command discovery and validation
-- RPC client and dispatch primitives
-- executor surfaces for deterministic command invocation
+- protocol-first client API (`yai_sdk_client_*`) for generic control calls
+- RPC transport primitives
 - enterprise return-code guarantees for operator/automation integration
 - versioned API/ABI anchors for compatibility control
 

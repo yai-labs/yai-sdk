@@ -37,10 +37,12 @@ The following modules are included in `yai_sdk/public.h` and are public:
 
 - Errors: `yai_sdk/errors.h`
 - Paths: `yai_sdk/paths.h`
+- Protocol client: `yai_sdk/client.h`
 - Registry: `yai_sdk/registry/*` (lookup/help/validate)
-- Executor: `yai_sdk/ops/executor.h`
-- Dispatch: `yai_sdk/ops/ops_dispatch.h`
 - RPC client: `yai_sdk/rpc/rpc.h`
+
+Legacy note:
+- `yai_sdk/ops/*` remains available only for internal/backward compatibility and is not part of the recommended protocol-first surface.
 
 ABI anchors:
 - `YAI_SDK_ABI_VERSION`
