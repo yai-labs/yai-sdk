@@ -36,6 +36,8 @@ static char g_last_status[16] = "error";
 static char g_last_code[64] = "INTERNAL_ERROR";
 static char g_last_reason[256] = "uninitialized";
 static char g_last_command_id[128] = "yai.unknown.unknown";
+static char g_last_trace_id[128] = "";
+static char g_last_target_plane[16] = "kernel";
 
 /* --------------------------------------------------------------------------
  * Helpers
@@ -44,7 +46,9 @@ static char g_last_command_id[128] = "yai.unknown.unknown";
 static void set_last_reply(const char *status,
                            const char *code,
                            const char *reason,
-                           const char *command_id)
+                           const char *command_id,
+                           const char *trace_id,
+                           const char *target_plane)
 {
     snprintf(g_last_status, sizeof(g_last_status), "%s", (status && status[0]) ? status : "error");
     snprintf(g_last_code, sizeof(g_last_code), "%s", (code && code[0]) ? code : "INTERNAL_ERROR");
@@ -53,24 +57,38 @@ static void set_last_reply(const char *status,
              sizeof(g_last_command_id),
              "%s",
              (command_id && command_id[0]) ? command_id : "yai.unknown.unknown");
+    snprintf(g_last_trace_id, sizeof(g_last_trace_id), "%s", (trace_id && trace_id[0]) ? trace_id : "");
+    snprintf(g_last_target_plane, sizeof(g_last_target_plane), "%s", (target_plane && target_plane[0]) ? target_plane : "kernel");
+}
+
+static const char *infer_target_plane_from_command(const char *command_id)
+{
+    if (!command_id)
+        return "kernel";
+    if (strncmp(command_id, "yai.kernel.", 11) == 0)
+        return "kernel";
+    if (strncmp(command_id, "yai.engine.", 11) == 0)
+        return "engine";
+    return "root";
 }
 
 static void set_last_reply_from_rc(int rc, const char *command_id)
 {
+    const char *target_plane = infer_target_plane_from_command(command_id);
     if (rc == YAI_SDK_OK)
-        set_last_reply("ok", "OK", "ok", command_id);
+        set_last_reply("ok", "OK", "ok", command_id, "", target_plane);
     else if (rc == YAI_SDK_NYI)
-        set_last_reply("nyi", "NOT_IMPLEMENTED", "nyi_deterministic", command_id);
+        set_last_reply("nyi", "NOT_IMPLEMENTED", "nyi_deterministic", command_id, "", target_plane);
     else if (rc == YAI_SDK_BAD_ARGS)
-        set_last_reply("error", "BAD_ARGS", "bad_args", command_id);
+        set_last_reply("error", "BAD_ARGS", "bad_args", command_id, "", target_plane);
     else if (rc == YAI_SDK_UNAUTHORIZED)
-        set_last_reply("error", "UNAUTHORIZED", "unauthorized", command_id);
+        set_last_reply("error", "UNAUTHORIZED", "unauthorized", command_id, "", target_plane);
     else if (rc == YAI_SDK_RUNTIME_NOT_READY)
-        set_last_reply("error", "RUNTIME_NOT_READY", "runtime_not_ready", command_id);
+        set_last_reply("error", "RUNTIME_NOT_READY", "runtime_not_ready", command_id, "", target_plane);
     else if (rc == YAI_SDK_SERVER_OFF || rc == ENOTCONN)
-        set_last_reply("error", "SERVER_UNAVAILABLE", "server_unavailable", command_id);
+        set_last_reply("error", "SERVER_UNAVAILABLE", "server_unavailable", command_id, "", target_plane);
     else
-        set_last_reply("error", "INTERNAL_ERROR", "failure", command_id);
+        set_last_reply("error", "INTERNAL_ERROR", "failure", command_id, "", target_plane);
 }
 
 void yai_ops_last_reply(const char **status,
@@ -86,6 +104,20 @@ void yai_ops_last_reply(const char **status,
         *reason = g_last_reason;
     if (command_id)
         *command_id = g_last_command_id;
+}
+
+void yai_ops_last_reply_ext(const char **status,
+                            const char **code,
+                            const char **reason,
+                            const char **command_id,
+                            const char **trace_id,
+                            const char **target_plane)
+{
+    yai_ops_last_reply(status, code, reason, command_id);
+    if (trace_id)
+        *trace_id = g_last_trace_id;
+    if (target_plane)
+        *target_plane = g_last_target_plane;
 }
 
 static int is_error_payload(const char *s)
@@ -208,11 +240,11 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
     {
         if (rc == ENOTCONN)
         {
-            set_last_reply("error", "SERVER_UNAVAILABLE", "server_unavailable", command_id);
+            set_last_reply("error", "SERVER_UNAVAILABLE", "server_unavailable", command_id, "", "kernel");
         }
         else
         {
-            set_last_reply("error", "RUNTIME_NOT_READY", "runtime_not_ready", command_id);
+            set_last_reply("error", "RUNTIME_NOT_READY", "runtime_not_ready", command_id, "", "kernel");
         }
         return (rc == ENOTCONN) ? YAI_SDK_SERVER_OFF : YAI_SDK_RUNTIME_NOT_READY;
     }
@@ -221,7 +253,7 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
     if (!req)
     {
         yai_rpc_close(&c);
-        set_last_reply("error", "INTERNAL_ERROR", "request_encode_failed", command_id);
+        set_last_reply("error", "INTERNAL_ERROR", "request_encode_failed", command_id, "", "kernel");
         return YAI_SDK_IO;
     }
     cJSON_AddStringToObject(req, "type", "yai.control.call.v1");
@@ -238,7 +270,7 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
     if (!payload)
     {
         yai_rpc_close(&c);
-        set_last_reply("error", "INTERNAL_ERROR", "request_encode_failed", command_id);
+        set_last_reply("error", "INTERNAL_ERROR", "request_encode_failed", command_id, "", "kernel");
         return YAI_SDK_IO;
     }
 
@@ -261,9 +293,9 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
     if (rc != 0)
     {
         if (rc == ENOTCONN)
-            set_last_reply("error", "SERVER_UNAVAILABLE", "server_unavailable", command_id);
+            set_last_reply("error", "SERVER_UNAVAILABLE", "server_unavailable", command_id, "", "kernel");
         else
-            set_last_reply("error", "PROTOCOL_ERROR", "rpc_call_failed", command_id);
+            set_last_reply("error", "PROTOCOL_ERROR", "rpc_call_failed", command_id, "", "kernel");
         return (rc == ENOTCONN) ? YAI_SDK_SERVER_OFF : YAI_SDK_RPC;
     }
 
@@ -271,7 +303,7 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
     cJSON *resp = cJSON_Parse(out);
     if (!resp)
     {
-        set_last_reply("error", "PROTOCOL_ERROR", "response_parse_failed", command_id);
+        set_last_reply("error", "PROTOCOL_ERROR", "response_parse_failed", command_id, "", "kernel");
         return YAI_SDK_PROTOCOL;
     }
 
@@ -285,9 +317,12 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
     if (!cJSON_IsString(type) || !type->valuestring || strcmp(type->valuestring, "yai.exec.reply.v1") != 0)
     {
         cJSON_Delete(resp);
-        set_last_reply("error", "PROTOCOL_ERROR", "bad_response_type", command_id);
+        set_last_reply("error", "PROTOCOL_ERROR", "bad_response_type", command_id, "", "kernel");
         return YAI_SDK_PROTOCOL;
     }
+
+    const cJSON *trace_id = cJSON_GetObjectItemCaseSensitive(resp, "trace_id");
+    const cJSON *target_plane = cJSON_GetObjectItemCaseSensitive(resp, "target_plane");
 
     if (cJSON_IsString(status) && status->valuestring)
     {
@@ -309,7 +344,9 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
         cJSON_IsString(status) ? status->valuestring : "error",
         cJSON_IsString(code) ? code->valuestring : "PROTOCOL_ERROR",
         cJSON_IsString(reason) ? reason->valuestring : "missing_reason",
-        cJSON_IsString(reply_command_id) ? reply_command_id->valuestring : command_id);
+        cJSON_IsString(reply_command_id) ? reply_command_id->valuestring : command_id,
+        cJSON_IsString(trace_id) ? trace_id->valuestring : "",
+        cJSON_IsString(target_plane) ? target_plane->valuestring : "kernel");
 
     cJSON_Delete(resp);
     return mapped;
@@ -499,7 +536,7 @@ int yai_ops_dispatch_by_id(const char *command_id, int argc, char **argv)
     if (!command_id || command_id[0] == '\0')
         return YAI_SDK_BAD_ARGS;
 
-    set_last_reply("error", "INTERNAL_ERROR", "dispatch_pending", command_id);
+    set_last_reply("error", "INTERNAL_ERROR", "dispatch_pending", command_id, "", infer_target_plane_from_command(command_id));
 
     /* 0) bootstrap first */
     yai_ops_fn_t bs = find_bootstrap(command_id);

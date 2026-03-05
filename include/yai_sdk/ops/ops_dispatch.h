@@ -14,6 +14,13 @@ void yai_ops_last_reply(const char** status,
                         const char** reason,
                         const char** command_id);
 
+void yai_ops_last_reply_ext(const char** status,
+                            const char** code,
+                            const char** reason,
+                            const char** command_id,
+                            const char** trace_id,
+                            const char** target_plane);
+
 #ifdef __cplusplus
 }
 #endif

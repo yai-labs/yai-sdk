@@ -14,6 +14,12 @@ static void set_out(yai_exec_result_t *out, int code, const char *msg)
     return;
   out->code = code;
   out->message = msg;
+  out->status = NULL;
+  out->code_name = NULL;
+  out->reason = NULL;
+  out->command_id = NULL;
+  out->trace_id = NULL;
+  out->target_plane = NULL;
 }
 
 int yai_sdk_execute(const yai_exec_request_t *req, yai_exec_result_t *out)
@@ -33,12 +39,16 @@ int yai_sdk_execute(const yai_exec_request_t *req, yai_exec_result_t *out)
   const char *code = NULL;
   const char *reason = NULL;
   const char *reply_command_id = NULL;
-  yai_ops_last_reply(&status, &code, &reason, &reply_command_id);
+  const char *trace_id = NULL;
+  const char *target_plane = NULL;
+  yai_ops_last_reply_ext(&status, &code, &reason, &reply_command_id, &trace_id, &target_plane);
 
   if (!status) status = "error";
   if (!code) code = "INTERNAL_ERROR";
   if (!reason) reason = "unknown";
   if (!reply_command_id) reply_command_id = req->command_id;
+  if (!trace_id) trace_id = "";
+  if (!target_plane) target_plane = "kernel";
 
   int n = snprintf(msg_buf,
                    sizeof(msg_buf),
@@ -54,6 +64,15 @@ int yai_sdk_execute(const yai_exec_request_t *req, yai_exec_result_t *out)
   if (rc == ENOTCONN)
     rc = YAI_SDK_SERVER_OFF;
   set_out(out, rc, msg_buf[0] ? msg_buf : "yai-sdk: error");
+  if (out)
+  {
+    out->status = status;
+    out->code_name = code;
+    out->reason = reason;
+    out->command_id = reply_command_id;
+    out->trace_id = trace_id;
+    out->target_plane = target_plane;
+  }
 
   return rc;
 }

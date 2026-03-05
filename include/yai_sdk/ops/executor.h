@@ -21,6 +21,12 @@ extern "C"
   {
     int code;            // 0 ok, non-zero error class / errno
     const char *message; // optional (may be NULL)
+    const char *status;       // normalized status token
+    const char *code_name;    // normalized code token
+    const char *reason;       // normalized reason token
+    const char *command_id;   // canonical command id
+    const char *trace_id;     // trace id if available, else ""
+    const char *target_plane; // root|kernel|engine if available
   } yai_exec_result_t;
 
   /*
