@@ -168,7 +168,8 @@ int yai_law_help_print_global(void)
     }
 
     printf("\nHint:\n");
-    printf("  yai law help <group>\n");
+    printf("  yai law help <entrypoint>\n");
+    printf("  yai law help <entrypoint> <topic>\n");
     printf("  yai law help <command>\n");
     printf("  yai law help <command_id>\n");
 
