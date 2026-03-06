@@ -1,6 +1,7 @@
 # yai-sdk Documentation
 
 This directory contains the authoritative documentation entrypoints for SDK consumers and maintainers.
+The SDK is the programmatic bridge between `yai-law` taxonomy/contracts and YAI command surfaces.
 
 ## Start here
 

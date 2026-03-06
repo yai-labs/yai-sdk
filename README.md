@@ -12,7 +12,7 @@ Dependency and authority chain:
 
 - `yai-law`: canonical normative contracts
 - `yai-sdk`: law-constrained API/ABI surface
-- `yai-cli`: operator interface built on SDK primitives
+- `yai-cli`: command surface built on SDK primitives
 - `yai`: runtime implementation
 - `yai-ops`: operational validation and evidence
 
