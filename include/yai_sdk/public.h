@@ -23,6 +23,7 @@ const char *yai_sdk_version(void);
 
 /* ---- Platform paths ---- */
 #include <yai_sdk/paths.h>
+#include <yai_sdk/context.h>
 
 /* ---- Registry (published surface) ---- */
 #include <yai_sdk/registry/registry.h>

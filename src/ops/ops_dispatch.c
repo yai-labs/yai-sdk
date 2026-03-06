@@ -39,6 +39,7 @@ static char g_last_reason[256] = "uninitialized";
 static char g_last_command_id[128] = "yai.unknown.unknown";
 static char g_last_trace_id[128] = "";
 static char g_last_target_plane[16] = "kernel";
+static char g_last_data_json[2048] = "";
 static char g_reason_buf[160];
 
 /* --------------------------------------------------------------------------
@@ -173,6 +174,11 @@ void yai_ops_last_reply_ext(const char **status,
         *trace_id = g_last_trace_id;
     if (target_plane)
         *target_plane = g_last_target_plane;
+}
+
+const char *yai_ops_last_reply_data_json(void)
+{
+    return g_last_data_json;
 }
 
 static int is_error_payload(const char *s)
@@ -378,6 +384,7 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
 
     const cJSON *trace_id = cJSON_GetObjectItemCaseSensitive(resp, "trace_id");
     const cJSON *target_plane = cJSON_GetObjectItemCaseSensitive(resp, "target_plane");
+    const cJSON *data = cJSON_GetObjectItemCaseSensitive(resp, "data");
 
     if (cJSON_IsString(status) && status->valuestring)
     {
@@ -402,6 +409,17 @@ static int rpc_call_control_call_ws(const char *ws_id, const char *command_id, i
         cJSON_IsString(reply_command_id) ? reply_command_id->valuestring : command_id,
         cJSON_IsString(trace_id) ? trace_id->valuestring : "",
         cJSON_IsString(target_plane) ? target_plane->valuestring : "kernel");
+
+    g_last_data_json[0] = '\0';
+    if (data)
+    {
+        char *serialized = cJSON_PrintUnformatted((cJSON *)data);
+        if (serialized)
+        {
+            snprintf(g_last_data_json, sizeof(g_last_data_json), "%s", serialized);
+            free(serialized);
+        }
+    }
 
     cJSON_Delete(resp);
     return mapped;
@@ -608,6 +626,7 @@ int yai_ops_dispatch_by_id(const char *command_id, int argc, char **argv)
     if (!command_id || command_id[0] == '\0')
         return YAI_SDK_BAD_ARGS;
 
+    g_last_data_json[0] = '\0';
     set_last_reply("error", "INTERNAL_ERROR", "dispatch_pending", command_id, "", infer_target_plane_from_command(command_id));
 
     /* 0) bootstrap first */

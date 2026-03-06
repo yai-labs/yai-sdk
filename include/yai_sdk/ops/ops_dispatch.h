@@ -21,6 +21,10 @@ void yai_ops_last_reply_ext(const char** status,
                             const char** trace_id,
                             const char** target_plane);
 
+// Returns last reply "data" JSON object (serialized) when available.
+// The pointer references process-local static storage.
+const char* yai_ops_last_reply_data_json(void);
+
 #ifdef __cplusplus
 }
 #endif

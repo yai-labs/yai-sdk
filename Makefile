@@ -43,6 +43,7 @@ SRCS_PROTOCOL := \
 # Sorgenti dell'SDK (High Level API)
 SRCS_SDK := \
   src/sdk_public.c \
+  src/platform/context.c \
   src/platform/paths.c \
   src/registry/registry.c \
   src/registry/registry_help.c \
@@ -60,6 +61,7 @@ ALL_OBJS      := $(OBJS_PROTOCOL) $(OBJS_SDK)
 DEPS          := $(ALL_OBJS:.o=.d)
 
 TEST_BIN := $(BUILD_DIR)/tests/sdk_smoke
+WORKSPACE_TEST_BIN := $(BUILD_DIR)/tests/workspace_smoke
 
 # --- TARGETS ---
 .PHONY: all clean dirs test info libs
@@ -94,11 +96,17 @@ $(BUILD_DIR)/%.o: %.c | dirs
 clean:
 	@rm -rf $(BUILD_DIR) $(LIB_DIR)
 
-test: $(TEST_BIN)
+test: $(TEST_BIN) $(WORKSPACE_TEST_BIN)
 	@echo "[RUN] $<"
 	@$<
+	@echo "[RUN] $(WORKSPACE_TEST_BIN)"
+	@$(WORKSPACE_TEST_BIN)
 
 $(TEST_BIN): tests/sdk_smoke.c $(SDK_LIB) | dirs
+	@echo "[CC] $<"
+	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
+
+$(WORKSPACE_TEST_BIN): tests/workspace_smoke.c $(SDK_LIB) | dirs
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
 

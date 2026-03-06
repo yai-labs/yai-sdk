@@ -17,7 +17,12 @@ static int is_error_payload(const char *s)
 
 int main(void)
 {
-  (void)setenv("YAI_REGISTRY_DIR", "../yai-law", 1);
+  const char *law_root = getenv("YAI_LAW_ROOT");
+  if (law_root && law_root[0] != '\0') {
+    (void)setenv("YAI_REGISTRY_DIR", law_root, 1);
+  } else {
+    (void)setenv("YAI_REGISTRY_DIR", "../yai-law", 1);
+  }
 
   if (yai_sdk_abi_version() != YAI_SDK_ABI_VERSION)
   {
@@ -29,6 +34,27 @@ int main(void)
   {
     fprintf(stderr, "sdk_smoke: errstr mapping failed for YAI_SDK_SERVER_OFF\n");
     return 1;
+  }
+
+  {
+    char ws[64] = {0};
+    if (yai_sdk_context_clear_current_workspace() != 0) {
+      fprintf(stderr, "sdk_smoke: context clear failed\n");
+      return 1;
+    }
+    if (yai_sdk_context_set_current_workspace("ws_smoke_sdk") != 0) {
+      fprintf(stderr, "sdk_smoke: context set failed\n");
+      return 1;
+    }
+    if (yai_sdk_context_get_current_workspace(ws, sizeof(ws)) != 0 || strcmp(ws, "ws_smoke_sdk") != 0) {
+      fprintf(stderr, "sdk_smoke: context get mismatch\n");
+      return 1;
+    }
+    if (yai_sdk_context_resolve_workspace(NULL, ws, sizeof(ws)) != 0 || strcmp(ws, "ws_smoke_sdk") != 0) {
+      fprintf(stderr, "sdk_smoke: context resolve mismatch\n");
+      return 1;
+    }
+    (void)yai_sdk_context_clear_current_workspace();
   }
 
   /* 1) Offline registry lookup must work */

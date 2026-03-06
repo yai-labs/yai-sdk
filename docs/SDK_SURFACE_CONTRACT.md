@@ -41,6 +41,7 @@ The following modules are included in `yai_sdk/public.h` and are public:
 - Executor: `yai_sdk/ops/executor.h`
 - Dispatch: `yai_sdk/ops/ops_dispatch.h`
 - RPC client: `yai_sdk/rpc/rpc.h`
+- Workspace context: `yai_sdk/context.h`
 
 ABI anchors:
 - `YAI_SDK_ABI_VERSION`
@@ -54,3 +55,16 @@ When an API needs state that may change, the public surface MUST use opaque hand
 ## Evidence
 - `make test`
 - `./build/tests/sdk_smoke`
+
+## Workspace model bridge (v2)
+`yai_sdk/context.h` is the SDK bridge between runtime workspace state and CLI/session binding.
+
+Public guarantees:
+- current workspace binding persistence (`set/get/clear`)
+- deterministic effective workspace resolution:
+  1. explicit workspace
+  2. current binding
+  3. unresolved context
+- runtime-backed workspace validation via `yai.kernel.ws_status`
+
+This keeps CLI ergonomics (`ws use/current/clear`) aligned with kernel-owned workspace truth.
