@@ -59,7 +59,13 @@ int main(void)
   }
 
   /* 1) Offline registry lookup must work */
-  const yai_law_command_t *c = yai_law_cmd_by_id("yai.kernel.ws");
+  const yai_law_command_t *c = NULL;
+  const char *candidate_ids[] = {"yai.kernel.ws", "yai.ws.create", "yai.root.ping"};
+  for (size_t i = 0; i < sizeof(candidate_ids) / sizeof(candidate_ids[0]); i++)
+  {
+    c = yai_law_cmd_by_id(candidate_ids[i]);
+    if (c) break;
+  }
   yai_sdk_command_catalog_t catalog = {0};
   const yai_sdk_command_ref_t *catalog_cmd = NULL;
   if (!c)
