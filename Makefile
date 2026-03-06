@@ -44,9 +44,11 @@ SRCS_SDK := \
   src/sdk_public.c \
   src/platform/paths.c \
   src/client/client.c \
+  src/reply/reply_builder.c \
+  src/reply/reply_json.c \
   src/protocol/reply_map.c \
   src/registry/registry.c \
-  src/registry/command_catalog.c \
+  src/catalog/catalog.c \
   src/registry/registry_help.c \
   src/registry/registry_paths.c \
   src/registry/registry_cache.c \

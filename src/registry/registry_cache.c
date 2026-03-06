@@ -252,6 +252,16 @@ static int load_commands_table(
     cmds[i].group   = dup_json_str(c, "group");
     cmds[i].summary = dup_json_str(c, "summary");
 
+    cmds[i].surface    = dup_json_str(c, "surface");
+    cmds[i].entrypoint = dup_json_str(c, "entrypoint");
+    cmds[i].topic      = dup_json_str(c, "topic");
+    cmds[i].op         = dup_json_str(c, "op");
+    cmds[i].layer      = dup_json_str(c, "layer");
+    cmds[i].stability  = dup_json_str(c, "stability");
+
+    (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "aliases"),
+                            &cmds[i].aliases, &cmds[i].aliases_len);
+
     (void)load_args_array(cJSON_GetObjectItemCaseSensitive(c, "args"),
                           (yai_law_arg_t**)&cmds[i].args, &cmds[i].args_len);
 
@@ -335,6 +345,13 @@ void yai_law_registry_cache_free(yai_law_registry_cache_t* cache) {
       free((void*)c->name);
       free((void*)c->group);
       free((void*)c->summary);
+      free((void*)c->surface);
+      free((void*)c->entrypoint);
+      free((void*)c->topic);
+      free((void*)c->op);
+      free((void*)c->layer);
+      free((void*)c->stability);
+      free_string_array_owned(c->aliases, c->aliases_len);
 
       free_args_owned(c->args, c->args_len);
       free_string_array_owned(c->outputs, c->outputs_len);

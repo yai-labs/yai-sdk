@@ -2,7 +2,7 @@
 #pragma once
 
 #include <yai_sdk/client.h>
-#include <yai_sdk/rpc/rpc.h>
+#include <yai_sdk/rpc.h>
 
 struct yai_sdk_client {
     yai_rpc_client_t rpc;

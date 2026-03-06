@@ -37,6 +37,14 @@ typedef struct yai_law_command {
   const char* group;    // "verify"
   const char* summary;  // short
 
+  // Taxonomy metadata (law-driven help/navigation)
+  const char* surface;    // user|tool|internal
+  const char* entrypoint; // ws|run|gov|...
+  const char* topic;      // e.g. decision, evidence, root, kernel
+  const char* op;         // e.g. status, trace, make
+  const char* layer;      // boot|root|kernel|engine|mind|substrate|orch|docs
+  const char* stability;  // stable|beta|experimental
+
   // NEW: alias tokens for "<group> <name>" resolution and UX shortcuts
   // Example: aliases ["root", "control-root"] etc. (implementation decides meaning)
   const char** aliases;   // optional

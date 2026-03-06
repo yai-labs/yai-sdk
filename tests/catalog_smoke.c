@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "yai_sdk/public.h"
+#include "yai_sdk/yai_sdk.h"
 
 int main(void)
 {

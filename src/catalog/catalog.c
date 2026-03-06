@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
-#include "yai_sdk/registry/command_catalog.h"
+#include "yai_sdk/catalog.h"
 #include "yai_sdk/registry/registry_registry.h"
 
 #include <stdlib.h>
@@ -34,6 +34,15 @@ static int find_counter_slot(group_counter_t *counters, size_t len, const char *
     if (strcmp(counters[i].group, group) == 0) return (int)i;
   }
   return -1;
+}
+
+static int surface_matches(const char *surface, int mask)
+{
+  if (!surface || !surface[0]) return (mask & YAI_SDK_CATALOG_SURFACE_INTERNAL) != 0;
+  if (strcmp(surface, "user") == 0) return (mask & YAI_SDK_CATALOG_SURFACE_USER) != 0;
+  if (strcmp(surface, "tool") == 0) return (mask & YAI_SDK_CATALOG_SURFACE_TOOL) != 0;
+  if (strcmp(surface, "internal") == 0) return (mask & YAI_SDK_CATALOG_SURFACE_INTERNAL) != 0;
+  return 0;
 }
 
 static void free_partial(yai_sdk_command_catalog_t *out)
@@ -119,6 +128,12 @@ int yai_sdk_command_catalog_load(yai_sdk_command_catalog_t *out)
     snprintf(ref->group, sizeof(ref->group), "%s", c->group);
     snprintf(ref->name, sizeof(ref->name), "%s", c->name);
     snprintf(ref->id, sizeof(ref->id), "%s", c->id);
+    snprintf(ref->surface, sizeof(ref->surface), "%s", (c->surface && c->surface[0]) ? c->surface : "internal");
+    snprintf(ref->entrypoint, sizeof(ref->entrypoint), "%s", (c->entrypoint && c->entrypoint[0]) ? c->entrypoint : "run");
+    snprintf(ref->topic, sizeof(ref->topic), "%s", (c->topic && c->topic[0]) ? c->topic : c->group);
+    snprintf(ref->op, sizeof(ref->op), "%s", (c->op && c->op[0]) ? c->op : c->name);
+    snprintf(ref->layer, sizeof(ref->layer), "%s", (c->layer && c->layer[0]) ? c->layer : "root");
+    snprintf(ref->stability, sizeof(ref->stability), "%s", (c->stability && c->stability[0]) ? c->stability : "experimental");
     if (c->summary && c->summary[0]) {
       snprintf(ref->summary, sizeof(ref->summary), "%s", c->summary);
     } else {
@@ -177,4 +192,86 @@ const yai_sdk_command_ref_t *yai_sdk_command_catalog_find_by_id(
     }
   }
   return NULL;
+}
+
+const yai_sdk_command_ref_t *yai_sdk_command_catalog_find_by_path(
+    const yai_sdk_command_catalog_t *cat,
+    const char *entrypoint,
+    const char *topic,
+    const char *op,
+    int surface_mask)
+{
+  if (!cat || !entrypoint || !entrypoint[0]) return NULL;
+  if (surface_mask == 0) surface_mask = YAI_SDK_CATALOG_SURFACE_ALL;
+  for (size_t i = 0; i < cat->group_count; i++) {
+    const yai_sdk_command_group_t *g = &cat->groups[i];
+    for (size_t j = 0; j < g->command_count; j++) {
+      const yai_sdk_command_ref_t *c = &g->commands[j];
+      if (!surface_matches(c->surface, surface_mask)) continue;
+      if (strcmp(c->entrypoint, entrypoint) != 0) continue;
+      if (topic && topic[0] && strcmp(c->topic, topic) != 0) continue;
+      if (op && op[0] && strcmp(c->op, op) != 0) continue;
+      return c;
+    }
+  }
+  return NULL;
+}
+
+size_t yai_sdk_command_catalog_collect_entrypoints(
+    const yai_sdk_command_catalog_t *cat,
+    int surface_mask,
+    const char **out_entrypoints,
+    size_t out_cap)
+{
+  size_t n = 0;
+  if (!cat || !out_entrypoints || out_cap == 0) return 0;
+  if (surface_mask == 0) surface_mask = YAI_SDK_CATALOG_SURFACE_ALL;
+  for (size_t i = 0; i < cat->group_count; i++) {
+    const yai_sdk_command_group_t *g = &cat->groups[i];
+    for (size_t j = 0; j < g->command_count; j++) {
+      const yai_sdk_command_ref_t *c = &g->commands[j];
+      int seen = 0;
+      if (!surface_matches(c->surface, surface_mask)) continue;
+      for (size_t k = 0; k < n; k++) {
+        if (strcmp(out_entrypoints[k], c->entrypoint) == 0) {
+          seen = 1;
+          break;
+        }
+      }
+      if (seen) continue;
+      if (n < out_cap) out_entrypoints[n] = c->entrypoint;
+      n++;
+    }
+  }
+  return n;
+}
+
+size_t yai_catalog_list_groups(
+    const yai_catalog_t *cat,
+    const yai_catalog_group_t **out_groups)
+{
+  if (out_groups) {
+    *out_groups = (cat && cat->group_count > 0) ? cat->groups : NULL;
+  }
+  return (cat) ? cat->group_count : 0;
+}
+
+size_t yai_catalog_list_commands(
+    const yai_catalog_t *cat,
+    const char *group,
+    const yai_catalog_command_t **out_commands)
+{
+  const yai_catalog_group_t *g;
+  if (out_commands) *out_commands = NULL;
+  g = yai_sdk_command_catalog_find_group(cat, group);
+  if (!g) return 0;
+  if (out_commands) *out_commands = g->commands;
+  return g->command_count;
+}
+
+const yai_catalog_command_t *yai_catalog_find_by_id(
+    const yai_catalog_t *cat,
+    const char *canonical_id)
+{
+  return yai_sdk_command_catalog_find_by_id(cat, canonical_id);
 }
