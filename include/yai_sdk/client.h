@@ -20,6 +20,10 @@ typedef struct yai_sdk_reply {
     char status[8];
     char code[64];
     char reason[256];
+    char summary[256];
+    char hints[2][256];
+    int hint_count;
+    char details[512];
     char command_id[128];
     char trace_id[128];
     char target_plane[16];

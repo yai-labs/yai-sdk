@@ -130,6 +130,13 @@ int main(void)
       yai_sdk_command_catalog_free(&catalog);
       return 6;
     }
+    if (!out.summary[0])
+    {
+      fprintf(stderr, "sdk_smoke: expected reply summary\n");
+      yai_sdk_reply_free(&out);
+      yai_sdk_command_catalog_free(&catalog);
+      return 7;
+    }
     yai_sdk_reply_free(&out);
   }
 
