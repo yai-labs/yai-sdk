@@ -55,6 +55,20 @@ static char* dup_json_str(cJSON* obj, const char* key) {
   return yai_strdup0(v->valuestring);
 }
 
+static int dup_json_bool(cJSON *obj, const char *key)
+{
+  cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
+  if (!v) return 0;
+  return cJSON_IsTrue(v) ? 1 : 0;
+}
+
+static int dup_json_int(cJSON *obj, const char *key, int default_v)
+{
+  cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
+  if (!cJSON_IsNumber(v)) return default_v;
+  return (int)v->valuedouble;
+}
+
 static int load_string_array(cJSON* arr, const char*** out_items, size_t* out_len) {
   *out_items = NULL; *out_len = 0;
   if (!arr) return 0;
@@ -256,8 +270,16 @@ static int load_commands_table(
     cmds[i].entrypoint = dup_json_str(c, "entrypoint");
     cmds[i].topic      = dup_json_str(c, "topic");
     cmds[i].op         = dup_json_str(c, "op");
+    cmds[i].domain     = dup_json_str(c, "domain");
     cmds[i].layer      = dup_json_str(c, "layer");
     cmds[i].stability  = dup_json_str(c, "stability");
+    cmds[i].canonical_path = dup_json_str(c, "canonical_path");
+    cmds[i].help_order = dup_json_int(c, "help_order", 0);
+    cmds[i].hidden = dup_json_bool(c, "hidden");
+    cmds[i].deprecated = dup_json_bool(c, "deprecated");
+    cmds[i].replaced_by = dup_json_str(c, "replaced_by");
+    cmds[i].since = dup_json_str(c, "since");
+    cmds[i].until = dup_json_str(c, "until");
 
     (void)load_string_array(cJSON_GetObjectItemCaseSensitive(c, "aliases"),
                             &cmds[i].aliases, &cmds[i].aliases_len);
@@ -349,8 +371,13 @@ void yai_law_registry_cache_free(yai_law_registry_cache_t* cache) {
       free((void*)c->entrypoint);
       free((void*)c->topic);
       free((void*)c->op);
+      free((void*)c->domain);
       free((void*)c->layer);
       free((void*)c->stability);
+      free((void*)c->canonical_path);
+      free((void*)c->replaced_by);
+      free((void*)c->since);
+      free((void*)c->until);
       free_string_array_owned(c->aliases, c->aliases_len);
 
       free_args_owned(c->args, c->args_len);
