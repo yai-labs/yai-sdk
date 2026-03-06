@@ -33,10 +33,6 @@ It is a governed consumer of pinned law.
 Canonical include for public consumers:
 - `#include <yai_sdk/public.h>`
 
-Compatibility wrappers:
-- `#include <yai_sdk/yai_sdk.h>`
-- `#include <yai_sdk/yai.h>`
-
 API discipline and compatibility guarantees:
 - `docs/SDK_API_DISCIPLINE.md`
 - `docs/SDK_SURFACE_CONTRACT.md`

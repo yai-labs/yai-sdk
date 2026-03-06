@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "yai_sdk/yai_sdk.h"
+#include "yai_sdk/public.h"
 
 int main(void)
 {

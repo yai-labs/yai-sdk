@@ -9,13 +9,6 @@ Scope: Public C API surface used by `yai-cli` and external consumers.
 Canonical public include:
 
 - `#include <yai_sdk/public.h>`
-
-Compatibility wrappers (supported, secondary):
-
-- `#include <yai_sdk/yai_sdk.h>`
-- `#include <yai_sdk/yai.h>`
-
-`yai_sdk/yai_sdk.h` and `yai_sdk/yai.h` must remain backward-compatible wrappers over `yai_sdk/public.h`.
 Anything not reachable through `yai_sdk/public.h` is outside the default compatibility contract unless explicitly documented.
 
 ## Semantic Versioning

@@ -13,12 +13,12 @@ if rg -n "yai_sdk/registry/" "$PUBLIC_HEADER" >/dev/null 2>&1; then
   fail "public.h must not include registry internal headers"
 fi
 
-# Compatibility wrappers must stay wrappers.
-if ! rg -n "#include <yai_sdk/public\.h>" "$ROOT/include/yai_sdk/yai_sdk.h" >/dev/null 2>&1; then
-  fail "yai_sdk.h must wrap public.h"
+# Legacy wrappers are removed; block reintroduction.
+if [[ -e "$ROOT/include/yai_sdk/yai_sdk.h" || -e "$ROOT/include/yai_sdk/yai.h" ]]; then
+  fail "legacy wrapper headers must not exist"
 fi
-if ! rg -n "#include <yai_sdk/public\.h>" "$ROOT/include/yai_sdk/yai.h" >/dev/null 2>&1; then
-  fail "yai.h must wrap public.h"
+if [[ -e "$ROOT/include/yai_sdk/registry/command_catalog.h" ]]; then
+  fail "legacy command_catalog compat header must not exist"
 fi
 
 # If sibling CLI repo exists, ensure it does not include SDK registry internals.

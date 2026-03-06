@@ -16,12 +16,6 @@ Generated for Consegna 13.
 - `include/yai_sdk/reply/reply_builder.h`
 - `include/yai_sdk/reply/reply_json.h`
 
-## Compatibility Headers (`compat`)
-
-- `include/yai_sdk/yai_sdk.h`
-- `include/yai_sdk/yai.h`
-- `include/yai_sdk/registry/command_catalog.h`
-
 ## Internal Headers (`internal`)
 
 - `include/yai_sdk/registry/registry.h`
@@ -40,7 +34,6 @@ Generated for Consegna 13.
 - `reply` -> `public_stable`
 - `protocol/rpc` -> `public_stable`
 - `registry raw loaders/validators` -> `internal`
-- `compat wrappers` -> `compat`
 
 ## CLI Coupling Cleanup
 
@@ -53,4 +46,5 @@ Now both consume `yai_sdk/catalog.h`.
 ## Residual Notes
 
 - `tests/sdk_smoke.c` uses explicit internal registry include for raw-registry smoke assertions. This is intentional test-only usage.
+- Legacy wrapper headers were removed from the include tree.
 - No runtime behavior was changed by this inventory wave.

@@ -17,11 +17,6 @@ typedef enum yai_sdk_catalog_surface_mask {
       YAI_SDK_CATALOG_SURFACE_PLUMBING,
 } yai_sdk_catalog_surface_mask_t;
 
-/* Compatibility aliases for previous user/tool/internal naming. */
-#define YAI_SDK_CATALOG_SURFACE_USER YAI_SDK_CATALOG_SURFACE_SURFACE
-#define YAI_SDK_CATALOG_SURFACE_TOOL YAI_SDK_CATALOG_SURFACE_ANCILLARY
-#define YAI_SDK_CATALOG_SURFACE_INTERNAL YAI_SDK_CATALOG_SURFACE_PLUMBING
-
 typedef enum yai_sdk_catalog_stability_mask {
   YAI_SDK_CATALOG_STABILITY_STABLE = 1 << 0,
   YAI_SDK_CATALOG_STABILITY_EXPERIMENTAL = 1 << 1,

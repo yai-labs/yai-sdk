@@ -14,8 +14,6 @@ Public release baseline: `v0.1.0` (2026-02-17).
 The official SDK public surface is defined by:
 
 - `include/yai_sdk/public.h` (canonical)
-- `include/yai_sdk/yai_sdk.h` (compat wrapper)
-- `include/yai_sdk/yai.h` (compat wrapper)
 - `docs/SDK_SURFACE_CONTRACT.md`
 - `docs/SDK_API_DISCIPLINE.md`
 
@@ -37,4 +35,3 @@ Current contract line: `SPECS_API_VERSION=v1`.
 ## Notes
 - Docs-only changes are typically PATCH.
 - Internal headers not reachable from `yai_sdk/public.h` are outside the public contract.
-- `yai_sdk/yai.h` compatibility behavior must remain stable unless a MAJOR bump is declared.
