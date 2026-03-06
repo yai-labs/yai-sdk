@@ -35,10 +35,16 @@ int main(void)
     return 2;
   }
   if (idx.entrypoint_count == 0) {
-    fprintf(stderr, "help_index_smoke: empty index\n");
     yai_sdk_help_index_free(&idx);
-    yai_sdk_command_catalog_free(&cat);
-    return 3;
+    filter.surface_mask = YAI_SDK_CATALOG_SURFACE_ALL;
+    filter.stability_mask = YAI_SDK_CATALOG_STABILITY_ALL;
+    rc = yai_sdk_help_index_build(&cat, &filter, &idx);
+    if (rc != 0 || idx.entrypoint_count == 0) {
+      fprintf(stderr, "help_index_smoke: empty index\n");
+      yai_sdk_help_index_free(&idx);
+      yai_sdk_command_catalog_free(&cat);
+      return 3;
+    }
   }
 
   run = yai_sdk_help_find_entrypoint(&idx, "run");

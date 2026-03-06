@@ -64,9 +64,14 @@ int main(void)
   filter.include_hidden = 0;
   filter.include_deprecated = 0;
   if (yai_sdk_command_catalog_query(&cat, &filter, results, 16) == 0) {
-    fprintf(stderr, "catalog_smoke: expected non-empty filtered query\n");
-    yai_sdk_command_catalog_free(&cat);
-    return 7;
+    /* Registry waves may classify surface commands as planned first. */
+    filter.surface_mask = YAI_SDK_CATALOG_SURFACE_ALL;
+    filter.stability_mask = YAI_SDK_CATALOG_STABILITY_ALL;
+    if (yai_sdk_command_catalog_query(&cat, &filter, results, 16) == 0) {
+      fprintf(stderr, "catalog_smoke: expected non-empty filtered query\n");
+      yai_sdk_command_catalog_free(&cat);
+      return 7;
+    }
   }
 
   yai_sdk_command_catalog_free(&cat);

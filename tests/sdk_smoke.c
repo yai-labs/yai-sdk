@@ -23,6 +23,41 @@ int main(void)
     return 1;
   }
 
+  {
+    char ws[64] = {0};
+    if (yai_sdk_context_clear_current_workspace() != 0)
+    {
+      fprintf(stderr, "sdk_smoke: context clear failed\n");
+      return 1;
+    }
+    if (yai_sdk_context_get_current_workspace(ws, sizeof(ws)) != 1)
+    {
+      fprintf(stderr, "sdk_smoke: context should be empty after clear\n");
+      return 1;
+    }
+    if (yai_sdk_context_set_current_workspace("ws_smoke_ctx") != 0)
+    {
+      fprintf(stderr, "sdk_smoke: context set failed\n");
+      return 1;
+    }
+    if (yai_sdk_context_get_current_workspace(ws, sizeof(ws)) != 0 || strcmp(ws, "ws_smoke_ctx") != 0)
+    {
+      fprintf(stderr, "sdk_smoke: context get mismatch\n");
+      return 1;
+    }
+    memset(ws, 0, sizeof(ws));
+    if (yai_sdk_context_resolve_workspace(NULL, ws, sizeof(ws)) != 0 || strcmp(ws, "ws_smoke_ctx") != 0)
+    {
+      fprintf(stderr, "sdk_smoke: context resolve mismatch\n");
+      return 1;
+    }
+    if (yai_sdk_context_clear_current_workspace() != 0)
+    {
+      fprintf(stderr, "sdk_smoke: context clear failed (post)\n");
+      return 1;
+    }
+  }
+
   /* 1) Offline registry lookup must work */
   const yai_law_command_t *c = yai_law_cmd_by_id("yai.kernel.ws");
   yai_sdk_command_catalog_t catalog = {0};

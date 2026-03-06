@@ -43,6 +43,7 @@ SRCS_PROTOCOL := \
 SRCS_SDK := \
   src/sdk_public.c \
   src/platform/paths.c \
+  src/platform/context.c \
   src/client/client.c \
   src/reply/reply_builder.c \
   src/reply/reply_json.c \
