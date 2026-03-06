@@ -4,7 +4,10 @@
 
 #include <yai_sdk/context.h>
 #include <yai_sdk/paths.h>
+#include <yai_sdk/client.h>
+#include <yai_sdk/errors.h>
 
+#include <cJSON.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -177,4 +180,81 @@ int yai_sdk_context_resolve_workspace(
     }
 
     return yai_sdk_context_get_current_workspace(out_ws_id, out_cap);
+}
+
+int yai_sdk_workspace_describe(const char *ws_id, yai_sdk_workspace_info_t *out)
+{
+    yai_sdk_client_t *client = NULL;
+    yai_sdk_client_opts_t opts = {0};
+    yai_sdk_reply_t reply = {0};
+    char req_json[512];
+    int rc = 0;
+
+    if (!out || !is_valid_ws_id(ws_id))
+        return YAI_SDK_BAD_ARGS;
+
+    memset(out, 0, sizeof(*out));
+    snprintf(out->ws_id, sizeof(out->ws_id), "%s", ws_id);
+
+    opts.ws_id = ws_id;
+    opts.arming = 1;
+    opts.role = "operator";
+    opts.auto_handshake = 1;
+
+    rc = yai_sdk_client_open(&client, &opts);
+    if (rc != 0)
+        return rc;
+
+    if (snprintf(req_json,
+                 sizeof(req_json),
+                 "{\"type\":\"yai.control.call.v1\",\"target_plane\":\"kernel\",\"command_id\":\"yai.kernel.ws_status\",\"argv\":[\"--ws-id\",\"%s\"]}",
+                 ws_id) <= 0)
+    {
+        yai_sdk_client_close(client);
+        return YAI_SDK_IO;
+    }
+
+    rc = yai_sdk_client_call_json(client, req_json, &reply);
+    yai_sdk_client_close(client);
+    if (rc != 0)
+    {
+        yai_sdk_reply_free(&reply);
+        return rc;
+    }
+
+    if (reply.exec_reply_json && reply.exec_reply_json[0])
+    {
+        cJSON *root = cJSON_Parse(reply.exec_reply_json);
+        if (root)
+        {
+            const cJSON *data = cJSON_GetObjectItemCaseSensitive(root, "data");
+            if (cJSON_IsObject(data))
+            {
+                const cJSON *exists = cJSON_GetObjectItemCaseSensitive(data, "exists");
+                const cJSON *state = cJSON_GetObjectItemCaseSensitive(data, "state");
+                const cJSON *root_path = cJSON_GetObjectItemCaseSensitive(data, "root_path");
+                out->exists = cJSON_IsTrue(exists) ? 1 : 0;
+                out->valid = out->exists;
+                if (cJSON_IsString(state) && state->valuestring)
+                    snprintf(out->state, sizeof(out->state), "%s", state->valuestring);
+                if (cJSON_IsString(root_path) && root_path->valuestring)
+                    snprintf(out->root_path, sizeof(out->root_path), "%s", root_path->valuestring);
+            }
+            cJSON_Delete(root);
+        }
+    }
+
+    yai_sdk_reply_free(&reply);
+    return YAI_SDK_OK;
+}
+
+int yai_sdk_context_validate_current_workspace(yai_sdk_workspace_info_t *out)
+{
+    char ws_id[64] = {0};
+    int rc = yai_sdk_context_get_current_workspace(ws_id, sizeof(ws_id));
+    if (rc == 1)
+        return YAI_SDK_BAD_ARGS;
+    if (rc != 0)
+        return YAI_SDK_IO;
+    return yai_sdk_workspace_describe(ws_id, out);
 }

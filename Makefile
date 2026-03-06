@@ -65,6 +65,7 @@ DEPS          := $(ALL_OBJS:.o=.d)
 TEST_BIN := $(BUILD_DIR)/tests/sdk_smoke
 CATALOG_TEST_BIN := $(BUILD_DIR)/tests/catalog_smoke
 HELP_INDEX_TEST_BIN := $(BUILD_DIR)/tests/help_index_smoke
+WORKSPACE_TEST_BIN := $(BUILD_DIR)/tests/workspace_smoke
 
 # --- TARGETS ---
 .PHONY: all clean dirs test info libs
@@ -99,13 +100,15 @@ $(BUILD_DIR)/%.o: %.c | dirs
 clean:
 	@rm -rf $(BUILD_DIR) $(LIB_DIR)
 
-test: $(TEST_BIN) $(CATALOG_TEST_BIN) $(HELP_INDEX_TEST_BIN)
+test: $(TEST_BIN) $(CATALOG_TEST_BIN) $(HELP_INDEX_TEST_BIN) $(WORKSPACE_TEST_BIN)
 	@echo "[RUN] $<"
 	@$<
 	@echo "[RUN] $(CATALOG_TEST_BIN)"
 	@$(CATALOG_TEST_BIN)
 	@echo "[RUN] $(HELP_INDEX_TEST_BIN)"
 	@$(HELP_INDEX_TEST_BIN)
+	@echo "[RUN] $(WORKSPACE_TEST_BIN)"
+	@$(WORKSPACE_TEST_BIN)
 
 $(TEST_BIN): tests/sdk_smoke.c $(SDK_LIB) | dirs
 	@echo "[CC] $<"
@@ -116,6 +119,10 @@ $(CATALOG_TEST_BIN): tests/catalog_smoke.c $(SDK_LIB) | dirs
 	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
 
 $(HELP_INDEX_TEST_BIN): tests/help_index_smoke.c $(SDK_LIB) | dirs
+	@echo "[CC] $<"
+	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
+
+$(WORKSPACE_TEST_BIN): tests/workspace_smoke.c $(SDK_LIB) | dirs
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
 

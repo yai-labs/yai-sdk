@@ -32,6 +32,21 @@ int yai_sdk_context_resolve_workspace(
     char *out_ws_id,
     size_t out_cap);
 
+typedef struct yai_sdk_workspace_info {
+    char ws_id[64];
+    int exists;
+    int valid;
+    char state[32];
+    char root_path[512];
+} yai_sdk_workspace_info_t;
+
+/* Runtime-backed workspace descriptor using yai.kernel.ws_status. */
+int yai_sdk_workspace_describe(const char *ws_id, yai_sdk_workspace_info_t *out);
+
+/* Validates current binding against runtime state.
+ * Returns 0 when current binding exists and runtime confirms a valid workspace. */
+int yai_sdk_context_validate_current_workspace(yai_sdk_workspace_info_t *out);
+
 #ifdef __cplusplus
 }
 #endif
