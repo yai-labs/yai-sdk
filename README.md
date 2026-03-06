@@ -28,6 +28,8 @@ It is a governed consumer of pinned law.
 - enterprise return-code guarantees for operator/automation integration
 - versioned API/ABI anchors for compatibility control
 
+`yai-sdk` does not redefine law contracts; it implements a programmatic surface over pinned law.
+
 ## Public surface contract
 
 Canonical include for public consumers:

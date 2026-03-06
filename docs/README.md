@@ -9,6 +9,16 @@ The SDK is the programmatic bridge between `yai-law` taxonomy/contracts and YAI 
 - `SDK_SURFACE_CONTRACT.md` - public C surface contract, compatibility semantics, ABI expectations
 - `reports/sdk_api_inventory_v1.md` - concrete header/module inventory for v1 discipline
 
+## What this docs tree is
+
+- Programmatic source of truth for SDK API behavior.
+- Compatibility and versioning guidance for SDK consumers.
+
+## What this docs tree is not
+
+- Not the normative source for command/reply/workspace semantics.
+- Normative authority remains in pinned `yai-law`.
+
 ## Documentation intent
 
 SDK documentation is implementation-guiding and consumer-facing, but never normative over `yai-law`.
