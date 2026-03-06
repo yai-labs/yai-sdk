@@ -59,20 +59,21 @@ int main(void)
   }
 
   /* 1) Offline registry lookup must work */
-  const yai_law_command_t *c = NULL;
-  const char *candidate_ids[] = {"yai.kernel.ws", "yai.ws.create", "yai.root.ping"};
-  for (size_t i = 0; i < sizeof(candidate_ids) / sizeof(candidate_ids[0]); i++)
+  if (yai_law_registry_init() != 0)
   {
-    c = yai_law_cmd_by_id(candidate_ids[i]);
-    if (c) break;
-  }
-  yai_sdk_command_catalog_t catalog = {0};
-  const yai_sdk_command_ref_t *catalog_cmd = NULL;
-  if (!c)
-  {
-    fprintf(stderr, "sdk_smoke: registry lookup failed\n");
+    fprintf(stderr, "sdk_smoke: registry init failed\n");
     return 2;
   }
+  const yai_law_registry_t *reg = yai_law_registry();
+  const yai_law_command_t *c = NULL;
+  yai_sdk_command_catalog_t catalog = {0};
+  const yai_sdk_command_ref_t *catalog_cmd = NULL;
+  if (!reg || reg->commands_len == 0)
+  {
+    fprintf(stderr, "sdk_smoke: registry is empty\n");
+    return 2;
+  }
+  c = &reg->commands[0];
   if (yai_sdk_command_catalog_load(&catalog) != 0)
   {
     fprintf(stderr, "sdk_smoke: catalog load failed\n");
