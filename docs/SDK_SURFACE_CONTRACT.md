@@ -5,9 +5,13 @@ Scope: `yai-sdk` public C API used by `yai-cli` and external consumers.
 
 ## Rule 0 — Single include
 Consumers MUST include only:
-- `#include <yai_sdk/yai_sdk.h>`
+- `#include <yai_sdk/public.h>`
 
-Direct inclusion of sub-headers is considered “advanced use” and is NOT covered by the compatibility contract unless explicitly documented.
+Compatibility wrappers:
+- `#include <yai_sdk/yai_sdk.h>`
+- `#include <yai_sdk/yai.h>`
+
+Direct inclusion of sub-headers is advanced use and is covered only when the header is explicitly classified as `public_stable` in `SDK_API_DISCIPLINE.md`.
 
 ## Compatibility promise
 This document defines what “compatible” means for the SDK public surface.
@@ -43,15 +47,15 @@ Any CLI-facing operation MUST honor this mapping.
 - `details` and `data` carry diagnostics and machine payloads.
 
 ## Public modules (v1)
-The following modules are included in `yai_sdk/yai_sdk.h` and are public:
+The following modules are part of the default public surface exposed by `yai_sdk/public.h`:
 
 - Errors: `yai_sdk/errors.h`
 - Paths: `yai_sdk/paths.h`
 - Protocol client: `yai_sdk/client.h`
 - Catalog: `yai_sdk/catalog.h` (command index view)
-- Registry: `yai_sdk/registry/*` (raw law loading and structural validation helpers)
-  - includes compatibility helpers used by catalog/index construction
 - RPC client: `yai_sdk/rpc.h`
+
+Raw registry headers under `yai_sdk/registry/*` are advanced compatibility views. They are not part of the default public-stable surface.
 
 ABI anchors:
 - `YAI_SDK_ABI_VERSION`

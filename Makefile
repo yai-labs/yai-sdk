@@ -66,9 +66,10 @@ TEST_BIN := $(BUILD_DIR)/tests/sdk_smoke
 CATALOG_TEST_BIN := $(BUILD_DIR)/tests/catalog_smoke
 HELP_INDEX_TEST_BIN := $(BUILD_DIR)/tests/help_index_smoke
 WORKSPACE_TEST_BIN := $(BUILD_DIR)/tests/workspace_smoke
+PUBLIC_SURFACE_TEST_BIN := $(BUILD_DIR)/tests/public_surface_smoke
 
 # --- TARGETS ---
-.PHONY: all clean dirs test info libs
+.PHONY: all clean dirs test info libs api-boundary-check
 
 all: libs
 
@@ -100,15 +101,21 @@ $(BUILD_DIR)/%.o: %.c | dirs
 clean:
 	@rm -rf $(BUILD_DIR) $(LIB_DIR)
 
-test: $(TEST_BIN) $(CATALOG_TEST_BIN) $(HELP_INDEX_TEST_BIN) $(WORKSPACE_TEST_BIN)
-	@echo "[RUN] $<"
-	@$<
+api-boundary-check:
+	@tools/sh/check_api_boundaries.sh
+
+test: api-boundary-check $(TEST_BIN) $(CATALOG_TEST_BIN) $(HELP_INDEX_TEST_BIN) $(WORKSPACE_TEST_BIN) $(PUBLIC_SURFACE_TEST_BIN)
+	@$(MAKE) api-boundary-check
+	@echo "[RUN] $(TEST_BIN)"
+	@$(TEST_BIN)
 	@echo "[RUN] $(CATALOG_TEST_BIN)"
 	@$(CATALOG_TEST_BIN)
 	@echo "[RUN] $(HELP_INDEX_TEST_BIN)"
 	@$(HELP_INDEX_TEST_BIN)
 	@echo "[RUN] $(WORKSPACE_TEST_BIN)"
 	@$(WORKSPACE_TEST_BIN)
+	@echo "[RUN] $(PUBLIC_SURFACE_TEST_BIN)"
+	@$(PUBLIC_SURFACE_TEST_BIN)
 
 $(TEST_BIN): tests/sdk_smoke.c $(SDK_LIB) | dirs
 	@echo "[CC] $<"
@@ -123,6 +130,10 @@ $(HELP_INDEX_TEST_BIN): tests/help_index_smoke.c $(SDK_LIB) | dirs
 	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
 
 $(WORKSPACE_TEST_BIN): tests/workspace_smoke.c $(SDK_LIB) | dirs
+	@echo "[CC] $<"
+	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
+
+$(PUBLIC_SURFACE_TEST_BIN): tests/public_surface_smoke.c $(SDK_LIB) | dirs
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
 

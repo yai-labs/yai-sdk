@@ -10,11 +10,12 @@ Canonical public include:
 
 - `#include <yai_sdk/public.h>`
 
-Compatibility wrapper (supported, but secondary):
+Compatibility wrappers (supported, secondary):
 
+- `#include <yai_sdk/yai_sdk.h>`
 - `#include <yai_sdk/yai.h>`
 
-`yai_sdk/yai.h` must remain a backward-compatible wrapper over `yai_sdk/public.h`.
+`yai_sdk/yai_sdk.h` and `yai_sdk/yai.h` must remain backward-compatible wrappers over `yai_sdk/public.h`.
 Anything not reachable through `yai_sdk/public.h` is outside the default compatibility contract unless explicitly documented.
 
 ## Semantic Versioning
