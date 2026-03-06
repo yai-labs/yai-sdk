@@ -3,7 +3,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 
-#include <yai_sdk/rpc/rpc.h>
+#include <yai_sdk/rpc.h>
 #include <yai_sdk/paths.h>
 
 #include <protocol.h>         /* yai_handshake_req_t / yai_handshake_ack_t */
@@ -115,7 +115,7 @@ static void set_trace_id(yai_rpc_envelope_t *env)
     /* keep within ~35 chars */
     char tmp[64];
     (void)snprintf(tmp, sizeof(tmp), "cli-%ld-%u", (long)getpid(), ctr);
-    (void)snprintf(env->trace_id, sizeof(env->trace_id), "%s", tmp);
+    (void)snprintf(env->trace_id, sizeof(env->trace_id), "%.*s", (int)sizeof(env->trace_id) - 1, tmp);
 }
 
 /* ============================================================
@@ -144,9 +144,16 @@ int yai_rpc_connect(yai_rpc_client_t *c, const char *ws_id)
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
 
-    /* strict: ensure NUL termination */
-    strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
-    addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
+    if (strlen(sock_path) >= sizeof(addr.sun_path))
+    {
+        close(fd);
+        return -4; /* path too long for AF_UNIX */
+    }
+    if (snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", sock_path) < 0)
+    {
+        close(fd);
+        return -4;
+    }
 
     socklen_t len =
         (socklen_t)(offsetof(struct sockaddr_un, sun_path) + strlen(addr.sun_path));
@@ -159,8 +166,12 @@ int yai_rpc_connect(yai_rpc_client_t *c, const char *ws_id)
 
     c->fd = fd;
 
-    strncpy(c->ws_id, ws_id, sizeof(c->ws_id) - 1);
-    c->ws_id[sizeof(c->ws_id) - 1] = '\0';
+    if (snprintf(c->ws_id, sizeof(c->ws_id), "%s", ws_id) < 0)
+    {
+        close(fd);
+        c->fd = -1;
+        return -2;
+    }
 
     /* default authority (explicitly NONE) */
     c->role = YAI_ROLE_NONE;
@@ -247,7 +258,8 @@ int yai_rpc_call_raw(
     /* reserved; keep deterministic */
     env.checksum = 0;
 
-    (void)snprintf(env.ws_id, sizeof(env.ws_id), "%s", c->ws_id);
+    if (snprintf(env.ws_id, sizeof(env.ws_id), "%.*s", (int)sizeof(env.ws_id) - 1, c->ws_id) < 0)
+        return -11;
     set_trace_id(&env);
 
     if (write_all(c->fd, &env, sizeof(env)) != 0)

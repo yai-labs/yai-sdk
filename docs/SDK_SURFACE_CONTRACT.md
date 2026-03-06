@@ -5,7 +5,7 @@ Scope: `yai-sdk` public C API used by `yai-cli` and external consumers.
 
 ## Rule 0 — Single include
 Consumers MUST include only:
-- `#include <yai_sdk/public.h>`
+- `#include <yai_sdk/yai_sdk.h>`
 
 Direct inclusion of sub-headers is considered “advanced use” and is NOT covered by the compatibility contract unless explicitly documented.
 
@@ -19,7 +19,7 @@ Compatible changes (no major bump):
 - Bug fixes that preserve documented return-code semantics.
 
 Breaking changes (major bump):
-- Removing/renaming any function/type/macro included by `yai_sdk/public.h`.
+- Removing/renaming any function/type/macro included by `yai_sdk/yai_sdk.h`.
 - Changing semantics of return codes for documented operations.
 - Changing struct layout/types exposed by `yai_sdk/yai.h`.
 
@@ -33,14 +33,15 @@ Breaking changes (major bump):
 Any CLI-facing operation MUST honor this mapping.
 
 ## Public modules (v1)
-The following modules are included in `yai_sdk/public.h` and are public:
+The following modules are included in `yai_sdk/yai_sdk.h` and are public:
 
 - Errors: `yai_sdk/errors.h`
 - Paths: `yai_sdk/paths.h`
-- Registry: `yai_sdk/registry/*` (lookup/help/validate)
-- Executor: `yai_sdk/ops/executor.h`
-- Dispatch: `yai_sdk/ops/ops_dispatch.h`
-- RPC client: `yai_sdk/rpc/rpc.h`
+- Protocol client: `yai_sdk/client.h`
+- Catalog: `yai_sdk/catalog.h` (command index view)
+- Registry: `yai_sdk/registry/*` (legacy law helpers, compat wave)
+  - includes command catalog/index API (`command_catalog.h`)
+- RPC client: `yai_sdk/rpc.h`
 
 ABI anchors:
 - `YAI_SDK_ABI_VERSION`
@@ -50,6 +51,16 @@ ABI anchors:
 
 ## Opaque handles rule
 When an API needs state that may change, the public surface MUST use opaque handles (`typedef struct yai_xxx yai_xxx_t;`) and provide create/destroy functions.
+
+## Registry Views
+
+SDK exposes a registry-derived command catalog view for consumers (CLI/UI):
+
+- `yai_sdk_command_catalog_load()`
+- `yai_sdk_command_catalog_find_group()`
+- `yai_sdk_command_catalog_find_command()`
+- `yai_sdk_command_catalog_find_by_id()`
+- `yai_sdk_command_catalog_free()`
 
 ## Evidence
 - `make test`

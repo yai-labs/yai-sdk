@@ -37,22 +37,24 @@ PROTOCOL_LIB := $(LIB_DIR)/libruntime_protocol.a
 # Sorgenti del solo Protocollo (Internal Core)
 SRCS_PROTOCOL := \
   src/rpc/rpc_client.c \
-  src/ops/ops_dispatch_gen.c \
   third_party/cjson/cJSON.c
 
 # Sorgenti dell'SDK (High Level API)
 SRCS_SDK := \
   src/sdk_public.c \
   src/platform/paths.c \
+  src/client/client.c \
+  src/reply/reply_builder.c \
+  src/reply/reply_json.c \
+  src/protocol/reply_map.c \
   src/registry/registry.c \
+  src/catalog/catalog.c \
   src/registry/registry_help.c \
   src/registry/registry_paths.c \
   src/registry/registry_cache.c \
   src/registry/registry_load.c \
   src/registry/registry_query.c \
-  src/registry/registry_validate.c \
-  src/ops/ops_dispatch.c \
-  src/ops/executor.c
+  src/registry/registry_validate.c
 
 OBJS_PROTOCOL := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS_PROTOCOL))
 OBJS_SDK      := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS_SDK))
@@ -60,6 +62,7 @@ ALL_OBJS      := $(OBJS_PROTOCOL) $(OBJS_SDK)
 DEPS          := $(ALL_OBJS:.o=.d)
 
 TEST_BIN := $(BUILD_DIR)/tests/sdk_smoke
+CATALOG_TEST_BIN := $(BUILD_DIR)/tests/catalog_smoke
 
 # --- TARGETS ---
 .PHONY: all clean dirs test info libs
@@ -94,11 +97,17 @@ $(BUILD_DIR)/%.o: %.c | dirs
 clean:
 	@rm -rf $(BUILD_DIR) $(LIB_DIR)
 
-test: $(TEST_BIN)
+test: $(TEST_BIN) $(CATALOG_TEST_BIN)
 	@echo "[RUN] $<"
 	@$<
+	@echo "[RUN] $(CATALOG_TEST_BIN)"
+	@$(CATALOG_TEST_BIN)
 
 $(TEST_BIN): tests/sdk_smoke.c $(SDK_LIB) | dirs
+	@echo "[CC] $<"
+	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
+
+$(CATALOG_TEST_BIN): tests/catalog_smoke.c $(SDK_LIB) | dirs
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
 
