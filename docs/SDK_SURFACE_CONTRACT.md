@@ -39,8 +39,8 @@ The following modules are included in `yai_sdk/yai_sdk.h` and are public:
 - Paths: `yai_sdk/paths.h`
 - Protocol client: `yai_sdk/client.h`
 - Catalog: `yai_sdk/catalog.h` (command index view)
-- Registry: `yai_sdk/registry/*` (legacy law helpers, compat wave)
-  - includes command catalog/index API (`command_catalog.h`)
+- Registry: `yai_sdk/registry/*` (raw law loading and structural validation helpers)
+  - includes compatibility helpers used by catalog/index construction
 - RPC client: `yai_sdk/rpc.h`
 
 ABI anchors:

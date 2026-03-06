@@ -17,7 +17,7 @@ typedef enum yai_sdk_catalog_surface_mask {
       YAI_SDK_CATALOG_SURFACE_PLUMBING,
 } yai_sdk_catalog_surface_mask_t;
 
-/* Backward-compat aliases (legacy user/tool/internal naming). */
+/* Compatibility aliases for previous user/tool/internal naming. */
 #define YAI_SDK_CATALOG_SURFACE_USER YAI_SDK_CATALOG_SURFACE_SURFACE
 #define YAI_SDK_CATALOG_SURFACE_TOOL YAI_SDK_CATALOG_SURFACE_ANCILLARY
 #define YAI_SDK_CATALOG_SURFACE_INTERNAL YAI_SDK_CATALOG_SURFACE_PLUMBING

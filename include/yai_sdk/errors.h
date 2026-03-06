@@ -2,7 +2,7 @@
 #define YAI_SDK_ERRORS_H
 
 /*
- * Exit code classes (aligned with yai-cli porcelain):
+ * Exit code classes (aligned with YAI CLI command surface):
  * 0: success
  * 2: invalid arguments / contract violation
  * 3: dependency missing (registry unavailable etc.)

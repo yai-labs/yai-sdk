@@ -20,7 +20,7 @@ static int cmp_group(const void *a, const void *b)
   return strcmp(ga->group, gb->group);
 }
 
-static int cmp_command_legacy(const void *a, const void *b)
+static int cmp_command_by_name(const void *a, const void *b)
 {
   const yai_sdk_command_ref_t *ca = (const yai_sdk_command_ref_t *)a;
   const yai_sdk_command_ref_t *cb = (const yai_sdk_command_ref_t *)b;
@@ -280,7 +280,7 @@ int yai_sdk_command_catalog_load(yai_sdk_command_catalog_t *out)
     qsort(out->groups[i].commands,
           out->groups[i].command_count,
           sizeof(out->groups[i].commands[0]),
-          cmp_command_legacy);
+          cmp_command_by_name);
   }
   qsort(out->groups, out->group_count, sizeof(out->groups[0]), cmp_group);
 
