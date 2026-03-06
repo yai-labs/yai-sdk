@@ -15,7 +15,14 @@ int main(void)
   const yai_sdk_command_ref_t *ping = NULL;
   int rc;
 
-  (void)setenv("YAI_REGISTRY_DIR", "../yai-law", 1);
+  {
+    const char *law_root = getenv("YAI_LAW_ROOT");
+    if (law_root && law_root[0] != '\0') {
+      (void)setenv("YAI_REGISTRY_DIR", law_root, 1);
+    } else {
+      (void)setenv("YAI_REGISTRY_DIR", "../yai-law", 1);
+    }
+  }
 
   rc = yai_sdk_command_catalog_load(&cat);
   if (rc != 0) {

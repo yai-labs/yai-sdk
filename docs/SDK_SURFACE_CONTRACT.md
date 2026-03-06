@@ -32,6 +32,16 @@ Breaking changes (major bump):
 
 Any CLI-facing operation MUST honor this mapping.
 
+## Reply architecture (v1)
+
+- Runtime replies use envelope `yai.exec.reply.v1`.
+- SDK exposes two reply views:
+  - `yai_sdk_reply_t` from `client.h` (transport-facing)
+  - `yai_reply_t` from `reply/reply.h` (builder/serialization-facing)
+- Human channels are `summary` and `hints` (or legacy `hint` compatibility).
+- `reason` remains the canonical internal cause token.
+- `details` and `data` carry diagnostics and machine payloads.
+
 ## Public modules (v1)
 The following modules are included in `yai_sdk/yai_sdk.h` and are public:
 

@@ -13,6 +13,18 @@
 #include <string.h>
 #include <stdio.h>
 
+static const char *summary_for_code(const char *code)
+{
+    if (!code || !code[0]) return "Command failed.";
+    if (strcmp(code, "OK") == 0) return "Command completed.";
+    if (strcmp(code, "NOT_IMPLEMENTED") == 0) return "This command is registered but not implemented yet.";
+    if (strcmp(code, "BAD_ARGS") == 0) return "Invalid command arguments.";
+    if (strcmp(code, "SERVER_UNAVAILABLE") == 0) return "Runtime endpoint is unreachable.";
+    if (strcmp(code, "RUNTIME_NOT_READY") == 0) return "Runtime handshake is not ready.";
+    if (strcmp(code, "UNAUTHORIZED") == 0 || strcmp(code, "DENIED") == 0) return "Operation denied by authority policy.";
+    return "Command failed.";
+}
+
 static void reply_zero(yai_sdk_reply_t *r)
 {
     if (!r) {
@@ -22,6 +34,7 @@ static void reply_zero(yai_sdk_reply_t *r)
     snprintf(r->status, sizeof(r->status), "error");
     snprintf(r->code, sizeof(r->code), "INTERNAL_ERROR");
     snprintf(r->reason, sizeof(r->reason), "internal_error");
+    snprintf(r->summary, sizeof(r->summary), "Command failed.");
     snprintf(r->command_id, sizeof(r->command_id), "yai.unknown.unknown");
     snprintf(r->target_plane, sizeof(r->target_plane), "kernel");
 }
@@ -30,6 +43,7 @@ static void reply_set(yai_sdk_reply_t *r,
                       const char *status,
                       const char *code,
                       const char *reason,
+                      const char *summary,
                       const char *command_id,
                       const char *trace_id,
                       const char *target_plane)
@@ -40,6 +54,12 @@ static void reply_set(yai_sdk_reply_t *r,
     snprintf(r->status, sizeof(r->status), "%s", (status && status[0]) ? status : "error");
     snprintf(r->code, sizeof(r->code), "%s", (code && code[0]) ? code : "INTERNAL_ERROR");
     snprintf(r->reason, sizeof(r->reason), "%s", (reason && reason[0]) ? reason : "internal_error");
+    snprintf(r->summary, sizeof(r->summary), "%s",
+             (summary && summary[0]) ? summary : summary_for_code(code));
+    r->hint_count = 0;
+    r->hints[0][0] = '\0';
+    r->hints[1][0] = '\0';
+    r->details[0] = '\0';
     snprintf(r->command_id, sizeof(r->command_id), "%s",
              (command_id && command_id[0]) ? command_id : "yai.unknown.unknown");
     snprintf(r->trace_id, sizeof(r->trace_id), "%s", (trace_id && trace_id[0]) ? trace_id : "");
@@ -176,6 +196,7 @@ int yai_sdk_client_call_json(yai_sdk_client_t *c, const char *control_call_json,
         int hrc = yai_sdk_client_handshake(c);
         if (hrc != 0) {
             reply_set(out, "error", "RUNTIME_NOT_READY", "runtime_not_ready",
+                      "Runtime handshake is not ready.",
                       fallback_command_id, "", "kernel");
             return hrc;
         }
@@ -195,10 +216,12 @@ int yai_sdk_client_call_json(yai_sdk_client_t *c, const char *control_call_json,
     if (rc != 0) {
         if (rc == -5) {
             reply_set(out, "error", "SERVER_UNAVAILABLE", "server_unavailable",
+                      "Runtime endpoint is unreachable.",
                       fallback_command_id, "", "kernel");
             return YAI_SDK_SERVER_OFF;
         }
         reply_set(out, "error", "PROTOCOL_ERROR", "rpc_call_failed",
+                  "RPC request failed.",
                   fallback_command_id, "", "kernel");
         return YAI_SDK_RPC;
     }
@@ -211,6 +234,7 @@ int yai_sdk_client_call_json(yai_sdk_client_t *c, const char *control_call_json,
     out->exec_reply_json = dup_bytes(raw, out_len);
     if (!out->exec_reply_json) {
         reply_set(out, "error", "INTERNAL_ERROR", "alloc_failed",
+                  "Reply allocation failed.",
                   fallback_command_id, "", "kernel");
         return YAI_SDK_IO;
     }
@@ -218,6 +242,7 @@ int yai_sdk_client_call_json(yai_sdk_client_t *c, const char *control_call_json,
     cJSON *resp = cJSON_Parse(out->exec_reply_json);
     if (!resp) {
         reply_set(out, "error", "PROTOCOL_ERROR", "response_parse_failed",
+                  "Reply parsing failed.",
                   fallback_command_id, "", "kernel");
         return YAI_SDK_PROTOCOL;
     }
@@ -234,17 +259,50 @@ int yai_sdk_client_call_json(yai_sdk_client_t *c, const char *control_call_json,
         strcmp(type->valuestring, "yai.exec.reply.v1") != 0) {
         cJSON_Delete(resp);
         reply_set(out, "error", "PROTOCOL_ERROR", "bad_response_type",
+                  "Reply envelope type is invalid.",
                   fallback_command_id, "", "kernel");
         return YAI_SDK_PROTOCOL;
     }
+
+    const cJSON *summary = cJSON_GetObjectItemCaseSensitive(resp, "summary");
+    const cJSON *hint = cJSON_GetObjectItemCaseSensitive(resp, "hint");
+    const cJSON *hints = cJSON_GetObjectItemCaseSensitive(resp, "hints");
+    const cJSON *details = cJSON_GetObjectItemCaseSensitive(resp, "details");
 
     reply_set(out,
               cJSON_IsString(status) ? status->valuestring : "error",
               cJSON_IsString(code) ? code->valuestring : "PROTOCOL_ERROR",
               cJSON_IsString(reason) ? reason->valuestring : "missing_reason",
+              cJSON_IsString(summary) ? summary->valuestring : NULL,
               cJSON_IsString(command_id) ? command_id->valuestring : fallback_command_id,
               cJSON_IsString(trace_id) ? trace_id->valuestring : "",
               cJSON_IsString(target_plane) ? target_plane->valuestring : "kernel");
+
+    const cJSON *harr = cJSON_IsArray(hints) ? hints : (cJSON_IsArray(hint) ? hint : NULL);
+    if (harr)
+    {
+        const cJSON *h0 = cJSON_GetArrayItem(harr, 0);
+        const cJSON *h1 = cJSON_GetArrayItem(harr, 1);
+        if (cJSON_IsString(h0) && h0->valuestring && h0->valuestring[0])
+        {
+            snprintf(out->hints[0], sizeof(out->hints[0]), "%s", h0->valuestring);
+            out->hint_count = 1;
+        }
+        if (cJSON_IsString(h1) && h1->valuestring && h1->valuestring[0])
+        {
+            snprintf(out->hints[1], sizeof(out->hints[1]), "%s", h1->valuestring);
+            out->hint_count = 2;
+        }
+    }
+    if (cJSON_IsObject(details))
+    {
+        char *tmp = cJSON_PrintUnformatted((cJSON *)details);
+        if (tmp)
+        {
+            snprintf(out->details, sizeof(out->details), "%s", tmp);
+            free(tmp);
+        }
+    }
 
     cJSON_Delete(resp);
     return yai_reply_map_rc(out->status, out->code);
@@ -265,7 +323,9 @@ int yai_sdk_client_ping(yai_sdk_client_t *c, const char *command_id, yai_sdk_rep
     if (c->auto_handshake && !c->handshaken) {
         int hrc = yai_sdk_client_handshake(c);
         if (hrc != 0) {
-            reply_set(out, "error", "RUNTIME_NOT_READY", "runtime_not_ready", cid, "", plane);
+            reply_set(out, "error", "RUNTIME_NOT_READY", "runtime_not_ready",
+                      "Runtime handshake is not ready.", cid, "", plane);
+            snprintf(out->summary, sizeof(out->summary), "Runtime handshake is not ready.");
             return hrc;
         }
     }
@@ -273,22 +333,26 @@ int yai_sdk_client_ping(yai_sdk_client_t *c, const char *command_id, yai_sdk_rep
     int rc = yai_rpc_call_raw(&c->rpc, YAI_CMD_PING, NULL, 0, buf, sizeof(buf) - 1, &out_len);
     if (rc != 0) {
         if (rc == -5) {
-            reply_set(out, "error", "SERVER_UNAVAILABLE", "server_unavailable", cid, "", plane);
+            reply_set(out, "error", "SERVER_UNAVAILABLE", "server_unavailable",
+                      "Runtime endpoint is unreachable.", cid, "", plane);
+            snprintf(out->summary, sizeof(out->summary), "Runtime endpoint is unreachable.");
             return YAI_SDK_SERVER_OFF;
         }
-        reply_set(out, "error", "PROTOCOL_ERROR", "rpc_call_failed", cid, "", plane);
+        reply_set(out, "error", "PROTOCOL_ERROR", "rpc_call_failed",
+                  "RPC request failed.", cid, "", plane);
+        snprintf(out->summary, sizeof(out->summary), "RPC request failed.");
         return YAI_SDK_RPC;
     }
     if (out_len >= sizeof(buf)) {
         out_len = (uint32_t)(sizeof(buf) - 1);
     }
     buf[out_len] = '\0';
-    reply_set(out, "ok", "OK", reason, cid, "", plane);
+    reply_set(out, "ok", "OK", reason, "Command completed.", cid, "", plane);
     {
-        char json[512];
+        char json[768];
         int n = snprintf(json, sizeof(json),
-                         "{\"type\":\"yai.exec.reply.v1\",\"status\":\"%s\",\"code\":\"%s\",\"reason\":\"%s\",\"command_id\":\"%s\",\"target_plane\":\"%s\",\"trace_id\":\"\"}",
-                         out->status, out->code, out->reason, out->command_id, out->target_plane);
+                         "{\"type\":\"yai.exec.reply.v1\",\"status\":\"%s\",\"code\":\"%s\",\"reason\":\"%s\",\"summary\":\"%s\",\"command_id\":\"%s\",\"target_plane\":\"%s\",\"trace_id\":\"\"}",
+                         out->status, out->code, out->reason, out->summary, out->command_id, out->target_plane);
         if (n > 0 && (size_t)n < sizeof(json)) {
             out->exec_reply_json = dup_bytes(json, (size_t)n);
         } else {
