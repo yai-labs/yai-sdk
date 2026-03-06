@@ -39,8 +39,8 @@ The following modules are included in `yai_sdk/yai_sdk.h` and are public:
 - Paths: `yai_sdk/paths.h`
 - Protocol client: `yai_sdk/client.h`
 - Catalog: `yai_sdk/catalog.h` (command index view)
-- Registry: `yai_sdk/registry/*` (legacy law helpers, compat wave)
-  - includes command catalog/index API (`command_catalog.h`)
+- Registry: `yai_sdk/registry/*` (raw law loading and structural validation helpers)
+  - includes compatibility helpers used by catalog/index construction
 - RPC client: `yai_sdk/rpc.h`
 
 ABI anchors:
@@ -54,13 +54,30 @@ When an API needs state that may change, the public surface MUST use opaque hand
 
 ## Registry Views
 
-SDK exposes a registry-derived command catalog view for consumers (CLI/UI):
+SDK exposes three distinct registry-derived layers:
 
-- `yai_sdk_command_catalog_load()`
-- `yai_sdk_command_catalog_find_group()`
-- `yai_sdk_command_catalog_find_command()`
+1. Raw registry (`registry/*`):
+- File/cache loading and structural validation.
+- Close to law JSON shape.
+
+2. Normalized catalog (`catalog.h`):
+- Stable command view for consumers.
+- Includes taxonomy metadata (`surface`, `stability`, `entrypoint`, `topic`, `op`, `domain`, `layer`, `canonical_path`).
+- Supports deterministic query/filter APIs and alias/path lookup.
+
+3. Help index (`catalog.h`):
+- Hierarchical index `entrypoint -> topic -> op` for CLI/UI help navigation.
+- Supports filtered views (surface vs ancillary/plumbing).
+
+Core APIs:
+- `yai_sdk_command_catalog_load()/free()`
+- `yai_sdk_command_catalog_query()`
 - `yai_sdk_command_catalog_find_by_id()`
-- `yai_sdk_command_catalog_free()`
+- `yai_sdk_command_catalog_find_by_canonical_path()`
+- `yai_sdk_command_catalog_resolve_path()`
+- `yai_sdk_command_catalog_resolve_alias()`
+- `yai_sdk_help_index_build()/free()`
+- `yai_sdk_help_find_entrypoint()/find_topic()/find_command()`
 
 ## Evidence
 - `make test`

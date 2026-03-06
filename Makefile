@@ -43,6 +43,7 @@ SRCS_PROTOCOL := \
 SRCS_SDK := \
   src/sdk_public.c \
   src/platform/paths.c \
+  src/platform/context.c \
   src/client/client.c \
   src/reply/reply_builder.c \
   src/reply/reply_json.c \
@@ -63,6 +64,7 @@ DEPS          := $(ALL_OBJS:.o=.d)
 
 TEST_BIN := $(BUILD_DIR)/tests/sdk_smoke
 CATALOG_TEST_BIN := $(BUILD_DIR)/tests/catalog_smoke
+HELP_INDEX_TEST_BIN := $(BUILD_DIR)/tests/help_index_smoke
 
 # --- TARGETS ---
 .PHONY: all clean dirs test info libs
@@ -97,17 +99,23 @@ $(BUILD_DIR)/%.o: %.c | dirs
 clean:
 	@rm -rf $(BUILD_DIR) $(LIB_DIR)
 
-test: $(TEST_BIN) $(CATALOG_TEST_BIN)
+test: $(TEST_BIN) $(CATALOG_TEST_BIN) $(HELP_INDEX_TEST_BIN)
 	@echo "[RUN] $<"
 	@$<
 	@echo "[RUN] $(CATALOG_TEST_BIN)"
 	@$(CATALOG_TEST_BIN)
+	@echo "[RUN] $(HELP_INDEX_TEST_BIN)"
+	@$(HELP_INDEX_TEST_BIN)
 
 $(TEST_BIN): tests/sdk_smoke.c $(SDK_LIB) | dirs
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
 
 $(CATALOG_TEST_BIN): tests/catalog_smoke.c $(SDK_LIB) | dirs
+	@echo "[CC] $<"
+	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
+
+$(HELP_INDEX_TEST_BIN): tests/help_index_smoke.c $(SDK_LIB) | dirs
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) $< -L$(LIB_DIR) -lyai_sdk -o $@
 

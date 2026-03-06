@@ -160,7 +160,7 @@ static int yai_try_set_law_dir_join(yai_law_paths_t* out, const char* base, cons
   return ENOENT;
 }
 
-// ---------------------------- API ----------------------------
+/* ---------------------------- API ---------------------------- */
 
 static void yai_law_paths_zero(yai_law_paths_t* p) { memset(p, 0, sizeof(*p)); }
 
@@ -179,31 +179,31 @@ int yai_law_paths_init(yai_law_paths_t* out, const char* repo_root_hint) {
   if (!out) return EINVAL;
   yai_law_paths_zero(out);
 
-  // 1) env override: points directly at the pinned law dir (registry root)
+  /* 1) Environment override: explicit pinned law directory. */
   const char* env = getenv("YAI_REGISTRY_DIR");
   if (env && env[0]) {
     int rc = yai_set_law_dir(out, env);
     if (rc != 0) return rc;
   }
 
-  // 2) SDK-root override (preferred in "CLI pins SDK, SDK pins law")
-  // YAI_SDK_ROOT is injected by the SDK Makefile (compile-time).
+  /* 2) SDK-root override (preferred in pinned SDK -> law layout). */
+  /* YAI_SDK_ROOT is injected by the SDK Makefile at compile time. */
   #ifdef YAI_SDK_ROOT
     if (!out->law_dir) {
-      const char* sdk_root = YAI_SDK_ROOT; // compile-time string
+      const char* sdk_root = YAI_SDK_ROOT; /* compile-time string */
       if (sdk_root && sdk_root[0]) {
-        // <sdk_root>/deps/yai-law
+        /* <sdk_root>/deps/yai-law */
         (void)yai_try_set_law_dir_join(out, sdk_root, "deps/yai-law");
       }
     }
   #endif
 
-  // 3) repo_root_hint/deps/yai-law (legacy convenience)
+  /* 3) repo_root_hint/deps/yai-law compatibility probe. */
   if (!out->law_dir && repo_root_hint && repo_root_hint[0]) {
     (void)yai_try_set_law_dir_join(out, repo_root_hint, "deps/yai-law");
   }
 
-  // 4) search from cwd upwards (legacy convenience)
+  /* 4) Fallback probe: walk upward from current working directory. */
   if (!out->law_dir) {
     char* cwd = yai_getcwd_dup();
     if (!cwd) return errno ? errno : ENOENT;
@@ -213,20 +213,20 @@ int yai_law_paths_init(yai_law_paths_t* out, const char* repo_root_hint) {
     out->law_dir = found;
   }
 
-  // Build canonical paths under yai-law (NEW layout)
+  /* Build canonical paths under yai-law current layout. */
   char* law_dir = out->law_dir;
 
-  // registries
+  /* Registries */
   out->registry_primitives = yai_path_join2(law_dir, "registry/primitives.v1.json");
   out->registry_commands   = yai_path_join2(law_dir, "registry/commands.v1.json");
   out->registry_artifacts  = yai_path_join2(law_dir, "registry/artifacts.v1.json");
 
-  // schemas
+  /* Schemas */
   out->schema_primitives   = yai_path_join2(law_dir, "registry/schema/primitives.v1.schema.json");
   out->schema_commands     = yai_path_join2(law_dir, "registry/schema/commands.v1.schema.json");
   out->schema_artifacts    = yai_path_join2(law_dir, "registry/schema/artifacts.v1.schema.json");
 
-  // schema dir
+  /* Schema directory */
   out->artifacts_schema_dir = yai_path_join2(law_dir, "registry/schema");
 
   if (!out->registry_primitives || !out->registry_commands || !out->registry_artifacts ||
@@ -236,7 +236,7 @@ int yai_law_paths_init(yai_law_paths_t* out, const char* repo_root_hint) {
     return ENOMEM;
   }
 
-  // Fail-fast: required files/dirs must exist
+  /* Fail fast: required files and directories must exist. */
   if (!yai_exists_file(out->registry_primitives) ||
       !yai_exists_file(out->registry_commands) ||
       !yai_exists_file(out->registry_artifacts) ||
@@ -257,7 +257,7 @@ void yai_law_paths_free(yai_law_paths_t* p) {
   yai_law_paths_zero(p);
 }
 
-// getters
+/* Getters */
 const char* yai_law_dir(const yai_law_paths_t* p) { return p ? p->law_dir : NULL; }
 const char* yai_law_registry_primitives(const yai_law_paths_t* p) { return p ? p->registry_primitives : NULL; }
 const char* yai_law_registry_commands(const yai_law_paths_t* p) { return p ? p->registry_commands : NULL; }

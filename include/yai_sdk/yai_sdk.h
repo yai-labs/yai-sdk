@@ -12,6 +12,7 @@ const char *yai_sdk_version(void);
 
 #include <yai_sdk/errors.h>
 #include <yai_sdk/paths.h>
+#include <yai_sdk/context.h>
 #include <yai_sdk/client.h>
 #include <yai_sdk/catalog.h>
 #include <yai_sdk/protocol.h>

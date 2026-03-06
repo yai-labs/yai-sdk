@@ -42,8 +42,12 @@ typedef struct yai_law_command {
   const char* entrypoint; // ws|run|gov|...
   const char* topic;      // e.g. decision, evidence, root, kernel
   const char* op;         // e.g. status, trace, make
+  const char* domain;     // workspace|runtime|governance|...
   const char* layer;      // boot|root|kernel|engine|mind|substrate|orch|docs
   const char* stability;  // stable|beta|experimental
+  const char* canonical_path; // e.g. "gov decision status"
+  int         help_order; // stable ordering hint for help renderers
+  int         hidden;     // 0/1
 
   // NEW: alias tokens for "<group> <name>" resolution and UX shortcuts
   // Example: aliases ["root", "control-root"] etc. (implementation decides meaning)
