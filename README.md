@@ -1,69 +1,46 @@
 # YAI SDK (C)
 
-YAI SDK is the canonical C interface for building on the YAI platform.
+YAI SDK is the canonical C programmatic surface for YAI consumers.
 
-It carries platform contracts into code: stable interfaces, governed integration surfaces, and aligned access to YAI system behavior under pinned law.
+It exposes stable client/context/protocol/reply/rpc APIs for applications and tooling.
+It is a compatibility surface consumer, not a normative source.
 
-This repository exists to make YAI programmable without weakening its rules.
+## Platform role
 
-## Platform position
+- `yai-law`: normative authority source
+- `yai`: integration/runtime authority
+- `yai-sdk`: programmatic compatibility surface
+- `yai-cli`: operator compatibility surface
 
-YAI SDK operates inside a disciplined platform chain:
+## Dependency posture
 
-`yai-law` → `yai-sdk` → `yai-cli` → `yai` → `yai-ops`
+- `yai-sdk` does not structurally pin `yai-law`.
+- `yai-sdk` may consume exported/generated compatibility artifacts.
+- `yai-sdk` must declare compatibility, not enforce live cross-repo dependency.
 
-Law defines the rules.  
-The SDK carries the interface.  
-Everything built on top of it inherits that discipline.
-
-## What this repository is
-
-This repository contains the canonical SDK surface for YAI, including:
-
-- stable public headers for system integration
-- governed client interfaces for platform access
-- protocol and transport integration aligned to pinned law
-- examples, wrappers, and developer-facing assets for adoption and extension
-
-## What this repository is not
-
-This repository does not own:
-
-- normative command, reply, workspace, or protocol semantics (`yai-law`)
-- the canonical command implementation (`yai-cli`)
-- the governed systems implementation itself (`yai`)
-
-## Public API
-
-Primary entrypoint:
+## Public API entrypoint
 
 ```c
 #include <yai_sdk/public.h>
 ```
 
-## API discipline
+## Primary public modules
 
-- `docs/SDK_API_DISCIPLINE.md`
+- `client`
+- `context`
+- `paths`
+- `protocol`
+- `reply`
+- `rpc`
+- `catalog` (public query surface)
+
+`registry/*` is not the repo identity axis; it is internal/tooling-oriented support.
+
+## Reference docs
+
 - `docs/SDK_SURFACE_CONTRACT.md`
+- `docs/SDK_API_DISCIPLINE.md`
+- `docs/SDK_COMPATIBILITY_MODEL.md`
+- `docs/SDK_DEPENDENCY_MATRIX.md`
 - `COMPATIBILITY.md`
 - `VERSIONING.md`
-
-## Developer surfaces
-
-- integration examples: `examples/`
-- Python wrapper skeleton: `wrappers/python/`
-- sanitizer checks: `make check`
-- coverage: `make coverage`
-- API reference: `make docs`
-- install artifacts: `make install`
-
-## Build
-
-```bash
-make -j4
-make test
-```
-
-## License
-
-Apache-2.0. See `LICENSE`.

@@ -1,29 +1,21 @@
 # yai-sdk Documentation
 
-This directory contains the authoritative programmatic documentation for `yai-sdk`.
-The SDK is the bridge between pinned `yai-law` artifacts and command surfaces (`yai-cli`, future TUI/GUI bindings).
+This directory contains programmatic documentation for `yai-sdk`.
 
-## Start Here
+## Start here
 
-- `SDK_API_DISCIPLINE.md` - API classes and boundary rules
-- `SDK_SURFACE_CONTRACT.md` - public C surface guarantees
-- `SDK_SURFACE_CONTRACT.md` (Operator section) - context/workspace APIs used by doctor/inspect/verify surfaces
-- `THREADING_MEMORY.md` - thread-safety and ownership semantics
-- `INTEGRATION_EXAMPLES.md` - example map and usage
-- `RUNTIME_RESOLUTION_POLICY.md` - canonical runtime/install/binary path resolution policy
-- `reports/sdk_api_inventory_v1.md` - current public/internal inventory
-- `reports/dx_reliability_checklist.md` - DX/reliability implementation status
+- `SDK_SURFACE_CONTRACT.md`
+- `SDK_API_DISCIPLINE.md`
+- `SDK_COMPATIBILITY_MODEL.md`
+- `SDK_DEPENDENCY_MATRIX.md`
+- `RUNTIME_RESOLUTION_POLICY.md`
 
-## Build and Verification
+## Dependency model
 
-- `make test` - smoke and boundary tests
-- `make check` - ASAN/UBSAN validation
-- `make coverage` - gcovr report (if available)
-- `make docs` - Doxygen HTML reference
-- `make examples` - compile integration examples
+`yai-sdk` is a compatibility consumer.
+It does not structurally pin `yai-law` and does not act as live law interpreter.
 
-## Scope and Authority
+## Scope note
 
-- This docs tree is **programmatic**, not normative.
-- Normative command/reply/workspace contracts remain owned by pinned `yai-law`.
-- If SDK docs diverge from pinned law artifacts, pinned law prevails.
+Normative authority remains in `yai-law`.
+SDK defines stable programmatic surfaces and compatibility behavior for consumers.

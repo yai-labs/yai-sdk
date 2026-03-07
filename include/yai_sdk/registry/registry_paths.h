@@ -1,3 +1,4 @@
+/* NOTE: internal compatibility/tooling surface; not public-stable SDK API. */
 /* SPDX-License-Identifier: Apache-2.0 */
 #pragma once
 

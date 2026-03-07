@@ -1,3 +1,4 @@
+/* NOTE: internal compatibility/tooling surface; not public-stable SDK API. */
 // include/yai_sdk/registry/registry_registry_validate.h
 #pragma once
 
