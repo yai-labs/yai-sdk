@@ -44,3 +44,8 @@ It is a compatibility surface consumer, not a normative source.
 - `docs/SDK_DEPENDENCY_MATRIX.md`
 - `COMPATIBILITY.md`
 - `VERSIONING.md`
+
+## Law compatibility declaration
+
+- Human-readable declaration: `LAW_COMPATIBILITY.md`
+- Machine-readable declaration: `law-compatibility.v1.json`

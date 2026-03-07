@@ -1,0 +1,13 @@
+{
+  "authority_repo": "yai-law",
+  "compatibility_mode": "compatibility-declaration",
+  "supported_baselines": [
+    "v1"
+  ],
+  "tested_baseline": "v1",
+  "notes": [
+    "yai-sdk is a compatibility consumer.",
+    "no structural pin to yai-law.",
+    "exported artifacts are allowed as compatibility inputs."
+  ]
+}
