@@ -10,6 +10,7 @@ The SDK is the bridge between pinned `yai-law` artifacts and command surfaces (`
 - `SDK_SURFACE_CONTRACT.md` (Operator section) - context/workspace APIs used by doctor/inspect/verify surfaces
 - `THREADING_MEMORY.md` - thread-safety and ownership semantics
 - `INTEGRATION_EXAMPLES.md` - example map and usage
+- `RUNTIME_RESOLUTION_POLICY.md` - canonical runtime/install/binary path resolution policy
 - `reports/sdk_api_inventory_v1.md` - current public/internal inventory
 - `reports/dx_reliability_checklist.md` - DX/reliability implementation status
 

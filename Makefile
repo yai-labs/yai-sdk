@@ -75,6 +75,7 @@ TEST_BIN := $(BUILD_DIR)/tests/sdk_smoke
 CATALOG_TEST_BIN := $(BUILD_DIR)/tests/catalog_smoke
 HELP_INDEX_TEST_BIN := $(BUILD_DIR)/tests/help_index_smoke
 WORKSPACE_TEST_BIN := $(BUILD_DIR)/tests/workspace_smoke
+RUNTIME_LOCATOR_TEST_BIN := $(BUILD_DIR)/tests/runtime_locator_smoke
 PUBLIC_SURFACE_TEST_BIN := $(BUILD_DIR)/tests/public_surface_smoke
 EXAMPLE_BASIC_BIN := $(BIN_DIR)/example_01_basic_connection
 EXAMPLE_CONTEXT_BIN := $(BIN_DIR)/example_02_workspace_context
@@ -121,7 +122,7 @@ clean:
 api-boundary-check:
 	@tools/sh/check_api_boundaries.sh
 
-test: api-boundary-check $(TEST_BIN) $(CATALOG_TEST_BIN) $(HELP_INDEX_TEST_BIN) $(WORKSPACE_TEST_BIN) $(PUBLIC_SURFACE_TEST_BIN)
+test: api-boundary-check $(TEST_BIN) $(CATALOG_TEST_BIN) $(HELP_INDEX_TEST_BIN) $(WORKSPACE_TEST_BIN) $(RUNTIME_LOCATOR_TEST_BIN) $(PUBLIC_SURFACE_TEST_BIN)
 	@$(MAKE) api-boundary-check
 	@echo "[RUN] $(TEST_BIN)"
 	@$(TEST_BIN)
@@ -131,6 +132,8 @@ test: api-boundary-check $(TEST_BIN) $(CATALOG_TEST_BIN) $(HELP_INDEX_TEST_BIN) 
 	@$(HELP_INDEX_TEST_BIN)
 	@echo "[RUN] $(WORKSPACE_TEST_BIN)"
 	@$(WORKSPACE_TEST_BIN)
+	@echo "[RUN] $(RUNTIME_LOCATOR_TEST_BIN)"
+	@$(RUNTIME_LOCATOR_TEST_BIN)
 	@echo "[RUN] $(PUBLIC_SURFACE_TEST_BIN)"
 	@$(PUBLIC_SURFACE_TEST_BIN)
 
@@ -182,6 +185,10 @@ $(HELP_INDEX_TEST_BIN): tests/help_index_smoke.c $(SDK_LIB) | dirs
 	@$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $< -L$(LIB_DIR) -lyai_sdk $(LDFLAGS) -Wl,-rpath,$(LIB_DIR) -o $@
 
 $(WORKSPACE_TEST_BIN): tests/workspace_smoke.c $(SDK_LIB) | dirs
+	@echo "[CC] $<"
+	@$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $< -L$(LIB_DIR) -lyai_sdk $(LDFLAGS) -Wl,-rpath,$(LIB_DIR) -o $@
+
+$(RUNTIME_LOCATOR_TEST_BIN): tests/runtime_locator_smoke.c $(SDK_LIB) | dirs
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $< -L$(LIB_DIR) -lyai_sdk $(LDFLAGS) -Wl,-rpath,$(LIB_DIR) -o $@
 
