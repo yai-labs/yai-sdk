@@ -7,6 +7,7 @@ The SDK is the bridge between pinned `yai-law` artifacts and command surfaces (`
 
 - `SDK_API_DISCIPLINE.md` - API classes and boundary rules
 - `SDK_SURFACE_CONTRACT.md` - public C surface guarantees
+- `SDK_SURFACE_CONTRACT.md` (Operator section) - context/workspace APIs used by doctor/inspect/verify surfaces
 - `THREADING_MEMORY.md` - thread-safety and ownership semantics
 - `INTEGRATION_EXAMPLES.md` - example map and usage
 - `reports/sdk_api_inventory_v1.md` - current public/internal inventory

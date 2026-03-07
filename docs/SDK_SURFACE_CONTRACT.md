@@ -50,6 +50,7 @@ The following modules are part of the default public surface exposed by `yai_sdk
 - Protocol client: `yai_sdk/client.h`
 - Catalog: `yai_sdk/catalog.h` (command index view)
 - RPC client: `yai_sdk/rpc.h`
+- Context/workspace: `yai_sdk/context.h`
 
 Raw registry headers under `yai_sdk/registry/*` are advanced internal views. They are not part of the default public-stable surface.
 
@@ -88,6 +89,15 @@ Core APIs:
 - `yai_sdk_command_catalog_resolve_alias()`
 - `yai_sdk_help_index_build()/free()`
 - `yai_sdk_help_find_entrypoint()/find_topic()/find_command()`
+
+Operator capability support APIs:
+
+- `yai_sdk_context_get_current_workspace()`
+- `yai_sdk_context_set_current_workspace()`
+- `yai_sdk_context_clear_current_workspace()`
+- `yai_sdk_context_resolve_workspace()`
+- `yai_sdk_context_validate_current_workspace()`
+- `yai_sdk_workspace_describe()`
 
 ## Evidence
 - `make test`
