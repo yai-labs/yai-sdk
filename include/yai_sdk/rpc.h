@@ -13,11 +13,14 @@ typedef struct yai_rpc_client {
     char ws_id[128];
     uint8_t role;
     uint8_t arming;
+    char correlation_id[64];
+    uint32_t trace_seq;
 } yai_rpc_client_t;
 
 int yai_rpc_connect(yai_rpc_client_t *c, const char *ws_id);
 void yai_rpc_close(yai_rpc_client_t *c);
 void yai_rpc_set_authority(yai_rpc_client_t *c, int arming, const char *role_str);
+void yai_rpc_set_correlation_id(yai_rpc_client_t *c, const char *correlation_id);
 
 int yai_rpc_call_raw(
     yai_rpc_client_t *c,

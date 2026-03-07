@@ -21,6 +21,8 @@
 #include <stdint.h>
 #include <ctype.h>
 
+#include "../platform/log_internal.h"
+
 /* ============================================================
    INTERNAL IO (STRICT)
    ============================================================ */
@@ -107,15 +109,24 @@ static int is_valid_ws_id(const char *ws_id)
    NOTE: envelope trace_id is typically 36 bytes -> keep short
    ============================================================ */
 
-static void set_trace_id(yai_rpc_envelope_t *env)
+static void set_trace_id(yai_rpc_client_t *c, yai_rpc_envelope_t *env)
 {
-    static uint32_t ctr = 0;
-    ctr++;
+    const char *prefix = "sdk";
+    uint32_t ctr = 0;
+    unsigned long pid = 0;
 
-    /* keep within ~35 chars */
-    char tmp[64];
-    (void)snprintf(tmp, sizeof(tmp), "cli-%ld-%u", (long)getpid(), ctr);
-    (void)snprintf(env->trace_id, sizeof(env->trace_id), "%.*s", (int)sizeof(env->trace_id) - 1, tmp);
+    if (!c || !env)
+        return;
+
+    if (c->correlation_id[0])
+        prefix = c->correlation_id;
+
+    c->trace_seq++;
+    ctr = c->trace_seq;
+    pid = (unsigned long)getpid();
+
+    (void)snprintf(env->trace_id, sizeof(env->trace_id), "%.16s-%lu-%u",
+                   prefix, pid, ctr);
 }
 
 /* ============================================================
@@ -131,6 +142,7 @@ int yai_rpc_connect(yai_rpc_client_t *c, const char *ws_id)
 
     memset(c, 0, sizeof(*c));
     c->fd = -1;
+    c->trace_seq = 0;
 
     char sock_path[512];
     if (yai_path_root_sock(sock_path, sizeof(sock_path)) != 0)
@@ -160,6 +172,7 @@ int yai_rpc_connect(yai_rpc_client_t *c, const char *ws_id)
 
     if (connect(fd, (struct sockaddr *)&addr, len) < 0)
     {
+        yai_sdk_log_emit(YAI_SDK_LOG_ERROR, "rpc", "connect failed");
         close(fd);
         return -5;
     }
@@ -176,6 +189,7 @@ int yai_rpc_connect(yai_rpc_client_t *c, const char *ws_id)
     /* default authority (explicitly NONE) */
     c->role = YAI_ROLE_NONE;
     c->arming = 0;
+    c->correlation_id[0] = '\0';
 
     return 0;
 }
@@ -260,7 +274,7 @@ int yai_rpc_call_raw(
 
     if (snprintf(env.ws_id, sizeof(env.ws_id), "%.*s", (int)sizeof(env.ws_id) - 1, c->ws_id) < 0)
         return -11;
-    set_trace_id(&env);
+    set_trace_id(c, &env);
 
     if (write_all(c->fd, &env, sizeof(env)) != 0)
         return -3;
@@ -338,4 +352,13 @@ int yai_rpc_handshake(yai_rpc_client_t *c)
         return -22;
 
     return 0;
+}
+void yai_rpc_set_correlation_id(yai_rpc_client_t *c, const char *correlation_id)
+{
+    if (!c) return;
+    if (!correlation_id || !correlation_id[0]) {
+        c->correlation_id[0] = '\0';
+        return;
+    }
+    (void)snprintf(c->correlation_id, sizeof(c->correlation_id), "%s", correlation_id);
 }

@@ -25,6 +25,7 @@ Headers:
 - `yai_sdk/catalog.h`
 - `yai_sdk/protocol.h`
 - `yai_sdk/rpc.h`
+- `yai_sdk/log.h`
 - `yai_sdk/reply/reply.h`
 - `yai_sdk/reply/reply_builder.h`
 - `yai_sdk/reply/reply_json.h`
@@ -67,6 +68,11 @@ Headers:
   - docs-first warning
   - compatibility wrapper or migration path
   - delayed removal aligned with semver major policy
+
+## Integration Aids
+
+- Examples: `examples/`
+- Wrapper skeletons: `wrappers/`
 
 ## Consumer Guidance
 

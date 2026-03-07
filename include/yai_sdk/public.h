@@ -17,6 +17,7 @@ const char *yai_sdk_version(void);
 #include <yai_sdk/catalog.h>
 #include <yai_sdk/protocol.h>
 #include <yai_sdk/rpc.h>
+#include <yai_sdk/log.h>
 #include <yai_sdk/reply/reply.h>
 #include <yai_sdk/reply/reply_builder.h>
 #include <yai_sdk/reply/reply_json.h>

@@ -5,6 +5,7 @@
 
 #include "client_internal.h"
 #include "../protocol/reply_map.h"
+#include "../platform/log_internal.h"
 
 #include <cJSON.h>
 #include <yai_protocol_ids.h>
@@ -117,15 +118,20 @@ int yai_sdk_client_open(yai_sdk_client_t **out, const yai_sdk_client_opts_t *opt
              (opts && opts->ws_id && opts->ws_id[0]) ? opts->ws_id : "default");
     snprintf(c->role, sizeof(c->role), "%s",
              (opts && opts->role && opts->role[0]) ? opts->role : "operator");
+    snprintf(c->correlation_id, sizeof(c->correlation_id), "%s",
+             (opts && opts->correlation_id && opts->correlation_id[0]) ? opts->correlation_id : "sdk");
     c->arming = (opts) ? (opts->arming ? 1 : 0) : 1;
     c->auto_handshake = (opts) ? (opts->auto_handshake ? 1 : 0) : 1;
 
     if (yai_rpc_connect(&c->rpc, c->ws_id) != 0) {
+        yai_sdk_log_emit(YAI_SDK_LOG_ERROR, "client", "rpc connect failed");
         free(c);
         return YAI_SDK_SERVER_OFF;
     }
     c->is_open = 1;
     yai_rpc_set_authority(&c->rpc, c->arming, c->role);
+    yai_rpc_set_correlation_id(&c->rpc, c->correlation_id);
+    yai_sdk_log_emit(YAI_SDK_LOG_INFO, "client", "client opened");
     *out = c;
     return YAI_SDK_OK;
 }
@@ -162,10 +168,22 @@ int yai_sdk_client_set_ws(yai_sdk_client_t *c, const char *ws_id)
     c->handshaken = 0;
     snprintf(c->ws_id, sizeof(c->ws_id), "%s", ws_id);
     if (yai_rpc_connect(&c->rpc, c->ws_id) != 0) {
+        yai_sdk_log_emit(YAI_SDK_LOG_ERROR, "client", "rpc reconnect failed");
         return YAI_SDK_SERVER_OFF;
     }
     c->is_open = 1;
     yai_rpc_set_authority(&c->rpc, c->arming, c->role);
+    yai_rpc_set_correlation_id(&c->rpc, c->correlation_id);
+    return YAI_SDK_OK;
+}
+
+int yai_sdk_client_set_correlation_id(yai_sdk_client_t *c, const char *correlation_id)
+{
+    if (!c || !correlation_id || !correlation_id[0]) {
+        return YAI_SDK_BAD_ARGS;
+    }
+    snprintf(c->correlation_id, sizeof(c->correlation_id), "%s", correlation_id);
+    yai_rpc_set_correlation_id(&c->rpc, c->correlation_id);
     return YAI_SDK_OK;
 }
 
@@ -195,6 +213,7 @@ int yai_sdk_client_call_json(yai_sdk_client_t *c, const char *control_call_json,
     if (c->auto_handshake && !c->handshaken) {
         int hrc = yai_sdk_client_handshake(c);
         if (hrc != 0) {
+            yai_sdk_log_emit(YAI_SDK_LOG_WARN, "client", "handshake not ready");
             reply_set(out, "error", "RUNTIME_NOT_READY", "runtime_not_ready",
                       "Runtime handshake is not ready.",
                       fallback_command_id, "", "kernel");
@@ -215,11 +234,13 @@ int yai_sdk_client_call_json(yai_sdk_client_t *c, const char *control_call_json,
 
     if (rc != 0) {
         if (rc == -5) {
+            yai_sdk_log_emit(YAI_SDK_LOG_ERROR, "client", "server unavailable");
             reply_set(out, "error", "SERVER_UNAVAILABLE", "server_unavailable",
                       "Runtime endpoint is unreachable.",
                       fallback_command_id, "", "kernel");
             return YAI_SDK_SERVER_OFF;
         }
+        yai_sdk_log_emit(YAI_SDK_LOG_ERROR, "client", "rpc call failed");
         reply_set(out, "error", "PROTOCOL_ERROR", "rpc_call_failed",
                   "RPC request failed.",
                   fallback_command_id, "", "kernel");
@@ -241,6 +262,7 @@ int yai_sdk_client_call_json(yai_sdk_client_t *c, const char *control_call_json,
 
     cJSON *resp = cJSON_Parse(out->exec_reply_json);
     if (!resp) {
+        yai_sdk_log_emit(YAI_SDK_LOG_ERROR, "client", "response parse failed");
         reply_set(out, "error", "PROTOCOL_ERROR", "response_parse_failed",
                   "Reply parsing failed.",
                   fallback_command_id, "", "kernel");

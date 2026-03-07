@@ -8,9 +8,9 @@ struct yai_sdk_client {
     yai_rpc_client_t rpc;
     char ws_id[128];
     char role[32];
+    char correlation_id[64];
     int arming;
     int auto_handshake;
     int is_open;
     int handshaken;
 };
-

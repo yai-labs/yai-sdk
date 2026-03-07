@@ -1,33 +1,27 @@
 # yai-sdk Documentation
 
-This directory contains the authoritative documentation entrypoints for SDK consumers and maintainers.
-The SDK is the programmatic bridge between `yai-law` taxonomy/contracts and YAI command surfaces.
+This directory contains the authoritative programmatic documentation for `yai-sdk`.
+The SDK is the bridge between pinned `yai-law` artifacts and command surfaces (`yai-cli`, future TUI/GUI bindings).
 
-## Start here
+## Start Here
 
-- `SDK_API_DISCIPLINE.md` - API boundary policy (`public_stable`, `compat`, `internal`)
-- `SDK_SURFACE_CONTRACT.md` - public C surface contract, compatibility semantics, ABI expectations
-- `reports/sdk_api_inventory_v1.md` - concrete header/module inventory for v1 discipline
+- `SDK_API_DISCIPLINE.md` - API classes and boundary rules
+- `SDK_SURFACE_CONTRACT.md` - public C surface guarantees
+- `THREADING_MEMORY.md` - thread-safety and ownership semantics
+- `INTEGRATION_EXAMPLES.md` - example map and usage
+- `reports/sdk_api_inventory_v1.md` - current public/internal inventory
+- `reports/dx_reliability_checklist.md` - DX/reliability implementation status
 
-## What this docs tree is
+## Build and Verification
 
-- Programmatic source of truth for SDK API behavior.
-- Compatibility and versioning guidance for SDK consumers.
+- `make test` - smoke and boundary tests
+- `make check` - ASAN/UBSAN validation
+- `make coverage` - gcovr report (if available)
+- `make docs` - Doxygen HTML reference
+- `make examples` - compile integration examples
 
-## What this docs tree is not
+## Scope and Authority
 
-- Not the normative source for command/reply/workspace semantics.
-- Normative authority remains in pinned `yai-law`.
-
-## Documentation intent
-
-SDK documentation is implementation-guiding and consumer-facing, but never normative over `yai-law`.
-When a conflict exists between SDK docs and pinned law artifacts, pinned law prevails.
-
-## Cross-repo alignment
-
-This documentation is maintained to stay consistent with:
-- `yai-law` (normative contracts)
-- `yai-cli` (operator consumption)
-- `yai` (runtime surfaces)
-- `yai-ops` (evidence and operational validation)
+- This docs tree is **programmatic**, not normative.
+- Normative command/reply/workspace contracts remain owned by pinned `yai-law`.
+- If SDK docs diverge from pinned law artifacts, pinned law prevails.

@@ -1,6 +1,6 @@
 # SDK API Inventory v1
 
-Generated for Consegna 13.
+Generated for API Discipline v1.
 
 ## Canonical Public Headers (`public_stable`)
 
@@ -12,6 +12,7 @@ Generated for Consegna 13.
 - `include/yai_sdk/catalog.h`
 - `include/yai_sdk/protocol.h`
 - `include/yai_sdk/rpc.h`
+- `include/yai_sdk/log.h`
 - `include/yai_sdk/reply/reply.h`
 - `include/yai_sdk/reply/reply_builder.h`
 - `include/yai_sdk/reply/reply_json.h`
@@ -29,22 +30,19 @@ Generated for Consegna 13.
 ## Module Classification
 
 - `client` -> `public_stable`
-- `catalog` -> `public_stable`
+- `catalog/help_index` -> `public_stable`
 - `context/workspace` -> `public_stable`
 - `reply` -> `public_stable`
 - `protocol/rpc` -> `public_stable`
+- `logging` -> `public_stable`
 - `registry raw loaders/validators` -> `internal`
 
-## CLI Coupling Cleanup
+## Examples and Wrappers
 
-Resolved:
-- `yai-cli/src/parse/parse.c` no longer includes `yai_sdk/registry/command_catalog.h`
-- `yai-cli/src/help/help.c` no longer includes `yai_sdk/registry/command_catalog.h`
+- Examples: `examples/01_basic_connection.c`, `examples/02_workspace_context.c`, `examples/03_custom_control_call.c`
+- Wrapper skeleton: `wrappers/python/yai_sdk.py`
 
-Now both consume `yai_sdk/catalog.h`.
+## CLI Coupling Status
 
-## Residual Notes
-
-- `tests/sdk_smoke.c` uses explicit internal registry include for raw-registry smoke assertions. This is intentional test-only usage.
-- Legacy wrapper headers were removed from the include tree.
-- No runtime behavior was changed by this inventory wave.
+`yai-cli` should consume only `public_stable` headers (prefer `yai_sdk/public.h`).
+No `yai_sdk/registry/*` include is allowed in CLI production code.

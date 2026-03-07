@@ -1,6 +1,8 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
 
 jobs:
   integrity-check:
@@ -12,11 +14,24 @@ jobs:
           test -f deps/yai-law.ref
           grep -E '^law_sha=[0-9a-f]{40}$' deps/yai-law.ref
 
-  build:
+  build-test:
     needs: integrity-check
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu-x86_64
+            runner: ubuntu-latest
+          - name: ubuntu-arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential make git python3 python3-pip doxygen
 
       - name: Checkout pinned yai-law
         run: |
@@ -28,9 +43,65 @@ jobs:
       - name: Build
         env:
           YAI_LAW_ROOT: /tmp/yai-law
-        run: make
+        run: make -j4
 
       - name: Test
         env:
           YAI_LAW_ROOT: /tmp/yai-law
         run: make test
+
+  distro-build:
+    needs: integrity-check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: debian-stable
+            image: debian:stable
+            install: apt-get update && apt-get install -y build-essential make git python3 doxygen
+          - name: alpine-latest
+            image: alpine:latest
+            install: apk add --no-cache build-base make git python3 doxygen
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ${{ matrix.install }}
+
+      - name: Checkout pinned yai-law
+        run: |
+          LAW_SHA="$(cut -d= -f2 deps/yai-law.ref)"
+          git clone --depth 1 https://github.com/yai-labs/yai-law.git /tmp/yai-law
+          git -C /tmp/yai-law fetch --depth 1 origin "$LAW_SHA"
+          git -C /tmp/yai-law checkout "$LAW_SHA"
+
+      - name: Build
+        env:
+          YAI_LAW_ROOT: /tmp/yai-law
+        run: make -j4
+
+  sanitizers:
+    needs: integrity-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential make git
+
+      - name: Checkout pinned yai-law
+        run: |
+          LAW_SHA="$(cut -d= -f2 deps/yai-law.ref)"
+          git clone --depth 1 https://github.com/yai-labs/yai-law.git /tmp/yai-law
+          git -C /tmp/yai-law fetch --depth 1 origin "$LAW_SHA"
+          git -C /tmp/yai-law checkout "$LAW_SHA"
+
+      - name: Sanitizer check
+        env:
+          YAI_LAW_ROOT: /tmp/yai-law
+        run: make check

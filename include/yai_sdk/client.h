@@ -5,14 +5,30 @@
 extern "C" {
 #endif
 
+/**
+ * @brief Opaque SDK client handle.
+ *
+ * A client handle is not thread-safe for concurrent mutation.
+ * Use one handle per thread or external synchronization.
+ */
 typedef struct yai_sdk_client yai_sdk_client_t;
 
+/**
+ * @brief Client open options.
+ */
 typedef struct yai_sdk_client_opts {
+    /** Workspace identifier used by default for RPC calls. */
     const char *ws_id;
+    /** Optional custom UDS path (reserved for future use). */
     const char *uds_path;
+    /** Authority arming flag (0/1). */
     int arming;
+    /** Authority role string (e.g. "operator"). */
     const char *role;
+    /** If non-zero, perform handshake lazily before first call. */
     int auto_handshake;
+    /** Optional correlation id prefix used for trace generation. */
+    const char *correlation_id;
 } yai_sdk_client_opts_t;
 
 typedef struct yai_sdk_reply {
@@ -34,6 +50,7 @@ void yai_sdk_client_close(yai_sdk_client_t *c);
 
 int yai_sdk_client_set_authority(yai_sdk_client_t *c, int arming, const char *role);
 int yai_sdk_client_set_ws(yai_sdk_client_t *c, const char *ws_id);
+int yai_sdk_client_set_correlation_id(yai_sdk_client_t *c, const char *correlation_id);
 int yai_sdk_client_handshake(yai_sdk_client_t *c);
 
 int yai_sdk_client_call_json(yai_sdk_client_t *c, const char *control_call_json, yai_sdk_reply_t *out);
